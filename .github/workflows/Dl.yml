@@ -18,7 +18,7 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Download
+      - name: upd
         run: |
           sudo apt-get update
       - name: cache apt
@@ -26,7 +26,9 @@ jobs:
         with:
           packages: aria2
           version: 1.0
-            aria2c -d dloa '${{ inputs.upl }}'
+      - name: download
+        run: |
+          aria2c -d dloa '${{ inputs.upl }}'
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         with:
