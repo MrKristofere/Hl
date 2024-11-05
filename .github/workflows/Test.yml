@@ -20,7 +20,7 @@ jobs:
       - name: cache apt
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: aria2 p7zip-full p7zip-rar
+          packages: aria2 p7zip-full
           version: 1.0
       - name: download
         run: |
@@ -30,4 +30,4 @@ jobs:
         run: |
           7za l *
           7za x *
-          echo "CRC-32: $(crc32 *)"
+          echo "CRC-32: $(sha256sum *)"
