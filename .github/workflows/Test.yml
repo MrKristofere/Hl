@@ -29,5 +29,5 @@ jobs:
         working-directory: ./dloa
         run: |
           7za l *
-          7za x -o ./new *
+          7za x -o ./dloa/new *
           echo "MD5Hash: $(md5sum new/*)"
