@@ -31,5 +31,7 @@ jobs:
           7za l *
           7za x "-o new" *
           echo "SHA-256: $(sha256sum *)"
-            working-directory: ./dloa/new
-            echo "SHA-256: $(sha256sum *)"  
+      - name: check hash unzip files
+        working-directory: ./dloa/new
+        run: |
+          echo "SHA-256: $(sha256sum *)"
