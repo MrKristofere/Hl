@@ -30,4 +30,4 @@ jobs:
         run: |
           7za l *
           7za x *
-          echo "CRC-32: $(cksum -o 2 *)"
+          echo "CRC-32: $(cksum -v *)"
