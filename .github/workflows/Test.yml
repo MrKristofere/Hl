@@ -28,5 +28,5 @@ jobs:
       - name: unzip
         working-directory: ./dloa
         run: |
-          7za l *
+          7za x l *
           echo "CRC-32: $(crc32 *)"
