@@ -26,6 +26,6 @@ jobs:
         run: |
           aria2c -d dloa '${{ inputs.upl }}'
       - name: unzip
+        working-directory: ./dloa
         run: |
-          working-directory: ./dloa
           7z -x -l *
