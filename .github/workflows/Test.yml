@@ -34,4 +34,4 @@ jobs:
       - name: check hash unzip files
         working-directory: dloa/new
         run: |
-          echo "SHA-256: $(sha256sum *.dll)"
+          echo "SHA-256: $(sha256sum -c *)"
