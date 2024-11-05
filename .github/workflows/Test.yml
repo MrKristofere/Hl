@@ -29,9 +29,9 @@ jobs:
         working-directory: dloa
         run: |
           7za l *
-          7za x "-o fuck" *
+          7za x "-o new" *
           echo "SHA-256: $(sha256sum *)"
       - name: check hash unzip files
-        working-directory: dloa/new
+        working-directory: dloa
         run: |
           echo "SHA-256: $(sha256sum Razor1911/bin/steam_api.dll)"
