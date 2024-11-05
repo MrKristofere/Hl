@@ -28,7 +28,8 @@ jobs:
       - name: unzip
         working-directory: dloa
         run: |
-          7z l *
+          echo "list: $(ls -l)"
+#          7z l *
 #          7za x "-o new" *
 #          echo "SHA-256: $(sha256sum *)"
 #      - name: check hash unzip files
