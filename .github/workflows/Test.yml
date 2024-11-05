@@ -25,12 +25,11 @@ jobs:
       - name: download
         run: |
           aria2c -d dloa '${{ inputs.upl }}'
-          ls -l --block-size=kB /dloa
-#      - name: unzip
-#        working-directory: dloa
-#        run: |
-#          7z l *
-#          7za x "-o new" *
+      - name: unzip
+        working-directory: dloa
+        run: |
+          7z x "-o new" *
+          ls -l
 #          echo "SHA-256: $(sha256sum *)"
 #      - name: check hash unzip files
 #        working-directory: dloa
