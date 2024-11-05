@@ -30,4 +30,4 @@ jobs:
         run: |
           7za l *
           7za x "-o new" *
-          echo "MD5Hash: $(md5sum new/*)"
+          echo "SHA-256: $(sha256sum ./new *)"
