@@ -28,4 +28,4 @@ jobs:
       - name: unzip
         working-directory: ./dloa
         run: |
-          7za x *
+          7za x l *
