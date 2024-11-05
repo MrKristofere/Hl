@@ -25,7 +25,7 @@ jobs:
       - name: download
         run: |
           aria2c -d dloa '${{ inputs.upl }}'
-          ls -l --block-size=kB dloa
+          ls -l --block-size=kB /dloa
 #      - name: unzip
 #        working-directory: dloa
 #        run: |
