@@ -29,4 +29,4 @@ jobs:
         working-directory: ./dloa
         run: |
           7za l *
-          echo "CRC-32:$(crc32sum *)"
+          echo "CRC-32: $(crc32 *)"
