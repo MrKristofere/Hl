@@ -1,4 +1,4 @@
-name: Upload file
+name: inside archive
 on:
   workflow_dispatch:
     inputs:
@@ -28,4 +28,4 @@ jobs:
       - name: unzip
         working-directory: ./dloa
         run: |
-          7z -x -l *
+          7za l *
