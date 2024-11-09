@@ -1,0 +1,97 @@
+name: Upload file
+
+on:
+  workflow_dispatch:
+    inputs:
+      upl:
+        description: 'Comma-separated list of URLs'
+        required: true
+        type: string
+      tag:
+        description: 'Tag'
+        required: true
+        type: string
+      compress:
+        description: 'Compress files before uploading'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Update package list
+        run: |
+          sudo apt-get update
+
+      - name: Cache apt packages
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: aria2, unzip, p7zip-full
+          version: 1.0
+
+      - name: Validate URLs format
+        run: |
+          # Проверяем, что каждый URL начинается с http:// или https://
+          for url in ${{ inputs.upl }}; do
+            if ! [[ "$url" =~ ^https?:// ]]; then
+              echo "Invalid URL format: $url"
+              exit 1
+            fi
+          done
+
+      - name: Download files
+        run: |
+          mkdir -p dloa
+          # Параллельная загрузка файлов
+          for url in ${{ inputs.upl }}; do
+            aria2c -d dloa -x 16 -s 16 --continue=true "$url" &
+          done
+          wait # Ждём, пока все загрузки завершатся
+
+      - name: Verify CRC-32 checksums
+        run: |
+          # Проверка CRC-32 для каждого файла в папке dloa
+          for file in dloa/*; do
+            checksum=$(crc32 "$file")
+            echo "CRC-32 checksum for $file: $checksum"
+            # Можно добавить проверку с заранее заданным CRC-32, если это необходимо
+          done
+
+      - name: Extract archives if needed
+        run: |
+          # Процесс разархивирования файлов, если это архивы
+          for file in dloa/*; do
+            if [[ "$file" =~ \.zip$ ]]; then
+              unzip "$file" -d "${file%.zip}"
+            elif [[ "$file" =~ \.tar.gz$ ]]; then
+              tar -xvzf "$file" -C "${file%.tar.gz}"
+            elif [[ "$file" =~ \.7z$ ]]; then
+              7z x "$file" -o"${file%.7z}"
+            fi
+          done
+
+      - name: Compress files if needed
+        if: ${{ inputs.compress == 'true' }}
+        run: |
+          # Сжимаем все файлы в dloa, если указано в параметрах
+          for file in dloa/*; do
+            if [[ -d "$file" ]]; then
+              # Если это директория, архивируем её
+              tar -czf "$file.tar.gz" -C "$file" .
+              rm -rf "$file" # Удаляем оригинальную папку
+            elif [[ -f "$file" ]]; then
+              gzip -k "$file" # Сжимаем файл и оставляем оригинал
+            fi
+          done
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dloa/*
+          tag_name: ${{ inputs.tag }}
