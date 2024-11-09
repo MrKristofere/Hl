@@ -35,16 +35,6 @@ jobs:
           packages: aria2, unzip, p7zip-full
           version: 1.0
 
-      - name: Validate URLs format
-        run: |
-          # Проверяем, что каждый URL начинается с http:// или https://
-          for url in ${{ inputs.upl }}; do
-            if ! [[ "$url" =~ ^https?:// ]]; then
-              echo "Invalid URL format: $url"
-              exit 1
-            fi
-          done
-
       - name: Download files
         run: |
           mkdir -p dloa
