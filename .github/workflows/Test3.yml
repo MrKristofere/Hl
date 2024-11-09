@@ -3,29 +3,25 @@ on:
   workflow_dispatch:
     inputs:
       upl:
-        description: 'Comma-separated list of URLs to download (e.g., http://example.com/file.zip)'
+        description: 'Comma-separated list of URLs'
         required: true
         type: string
       tag:
-        description: 'Tag for GitHub release (e.g., v1.0.0)'
+        description: 'Tag for GitHub release'
         required: true
         type: string
       parallel_downloads:
-        description: 'Number of parallel downloads (e.g., 3)'
+        description: 'Number of parallel downloads'
         required: true
         type: string
-      upload_to:
-        description: |
-          'Comma-separated list of platforms to upload to. Choose from the following:
-          - github: Upload to GitHub release.
-          - telegram: Upload to Telegram bot.
-          - google_drive: Upload to Google Drive.
-          - yandex_disk: Upload to Yandex.Disk.
-          - both: Upload to both GitHub and Telegram.
-          - google_drive,yandex_disk: Upload to Google Drive and Yandex.Disk.
-          - etc.'
+      upload_destination:
+        description: 'Where to upload files (GitHub or Telegram or both)'
         required: true
-        type: string
+        type: choice
+        options:
+          - github
+          - telegram
+          - both
 
 permissions:
   contents: write
@@ -38,46 +34,56 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y aria2 curl unzip p7zip-full jq
-          mkdir -p dloa  # Create download directory
+          mkdir -p dloa  # Создаем каталог для загрузки
 
       - name: Validate input URLs
         run: |
           if [ -z "${{ inputs.upl }}" ]; then
-            echo "Error: No URLs provided for download."
+            echo "Ошибка: не переданы URL для загрузки."
             exit 1
           fi
 
       - name: Validate parallel_downloads
         run: |
-          # Ensure parallel_downloads is a positive integer
+          # Проверяем, что количество параллельных загрузок — это целое число больше 0
           if ! [[ "${{ inputs.parallel_downloads }}" =~ ^[0-9]+$ ]] || [ "${{ inputs.parallel_downloads }}" -le 0 ]; then
-            echo "Error: parallel_downloads must be a positive integer."
+            echo "Ошибка: параметр parallel_downloads должен быть положительным числом."
             exit 1
           fi
 
       - name: Prepare URL list
         run: |
+          # Убираем лишние пробелы перед и после запятых
           CLEANED_URLS=$(echo "${{ inputs.upl }}" | sed 's/ \+/ /g' | sed 's/ ,/,/g')
           IFS=',' read -ra URLS <<< "$CLEANED_URLS"
-          echo "Number of URLs: ${#URLS[@]}"
+          echo "Количество URL: ${#URLS[@]}"
+
+      - name: URL Encoding Function
+        run: |
+          encode_url() {
+            echo "$1" | jq -sRr @uri
+          }
+          export -f encode_url
 
       - name: Download files
         run: |
-          MAX_PARALLEL_DOWNLOADS=${{ inputs.parallel_downloads }}
-          RETRIES=3  # Maximum download retries
-          INITIAL_DELAY=2  # Initial delay in seconds
+          MAX_PARALLEL_DOWNLOADS=${{ inputs.parallel_downloads }}  # Получаем количество параллельных загрузок
+          RETRIES=3  # Максимальное количество попыток загрузки
+          INITIAL_DELAY=2  # Начальная задержка (сек)
           
           download_with_retries() {
             url=$1
             retries=0
-            until aria2c -d dloa -x 16 -s 16 --continue=true "$url"; do
+            encoded_url=$(encode_url "$url")  # Кодируем URL
+
+            until aria2c -d dloa -x 16 -s 16 --continue=true "$encoded_url"; do
               if (( retries >= RETRIES )); then
-                echo "Error: Failed to download file $url after $RETRIES attempts."
+                echo "Ошибка: не удалось скачать файл $encoded_url после $RETRIES попыток."
                 return 1
               fi
               retries=$((retries + 1))
-              sleep_time=$((INITIAL_DELAY ** retries))  # Exponential backoff
-              echo "Attempt $retries failed. Retrying in $sleep_time seconds."
+              sleep_time=$((INITIAL_DELAY ** retries))  # Экспоненциальная задержка
+              echo "Попытка скачивания $encoded_url не удалась. Повторная попытка ($retries из $RETRIES). Ожидание $sleep_time секунд."
               sleep $sleep_time
             done
             return 0
@@ -85,73 +91,84 @@ jobs:
 
           COUNTER=0
           for url in "${URLS[@]}"; do
-            download_with_retries "$url" &  # Run download in the background
+            download_with_retries "$url" &  # Запускаем скачивание в фоновом режиме
             COUNTER=$((COUNTER + 1))
 
-            # Handle parallel downloads
+            # Управляем количеством параллельных загрузок
             if (( COUNTER >= MAX_PARALLEL_DOWNLOADS )); then
-              echo "Reached maximum parallel downloads ($MAX_PARALLEL_DOWNLOADS), waiting for completion..."
-              wait  # Wait for all parallel downloads to finish
-              COUNTER=0
+              echo "Достигнут лимит параллельных загрузок ($MAX_PARALLEL_DOWNLOADS), ожидаем завершения..."
+              wait  # Ожидаем завершения всех параллельных загрузок
+              COUNTER=0  # Сброс счётчика параллельных загрузок
             fi
           done
-          wait  # Wait for remaining downloads to complete
+          wait  # Ожидаем завершения всех оставшихся параллельных загрузок
 
-      - name: Upload files to selected platforms
+      - name: Extract and check CRC32 for downloaded files
         run: |
-          upload_to_list=$(echo "${{ inputs.upload_to }}" | tr ',' '\n')
-
-          # Upload to GitHub
-          if [[ "$upload_to_list" == *"github"* ]]; then
-            echo "Uploading files to GitHub Releases..."
-            for file in dloa/*; do
-              if [ -f "$file" ]; then
-                echo "Uploading file to GitHub Release: $file"
-                gh release upload "${{ inputs.tag }}" "$file" --clobber
+          extract_with_retries() {
+            file=$1
+            retries=0
+            until [ -f "$file" ]; do
+              if (( retries >= 3 )); then
+                echo "Ошибка: файл $file не существует или поврежден. Пропускаем."
+                return 1
               fi
+              retries=$((retries + 1))
+              echo "Попытка извлечения файла $file не удалась. Повторная попытка ($retries из 3)."
+              sleep 2
             done
-          fi
 
-          # Upload to Telegram
-          if [[ "$upload_to_list" == *"telegram"* ]]; then
-            echo "Uploading files to Telegram..."
-            for file in dloa/*; do
-              if [ -f "$file" ]; then
-                echo "Uploading file to Telegram: $file"
-                curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
-                  -F chat_id=$CHAT_ID \
-                  -F document=@"$file" \
-                  -F caption="Uploaded file: $(basename $file)"
-              fi
-            done
-          fi
+            if [[ "$file" =~ \.zip$ ]]; then
+              unzip -q "$file" -d dloa/
+            elif [[ "$file" =~ \.tar\.gz$ ]]; then
+              tar -xzvf "$file" -C dloa/
+            elif [[ "$file" =~ \.tar$ ]]; then
+              tar -xvf "$file" -C dloa/
+            elif [[ "$file" =~ \.rar$ ]]; then
+              7z x "$file" -odloa
+            else
+              echo "Неизвестный формат файла для разархивации: $file"
+              return 1
+            fi
+            rm "$file"  # Удаляем оригинальный архив
+            return 0
+          }
 
-          # Upload to Google Drive
-          if [[ "$upload_to_list" == *"google_drive"* ]]; then
-            echo "Uploading files to Google Drive..."
-            for file in dloa/*; do
-              if [ -f "$file" ]; then
-                echo "Uploading file to Google Drive: $file"
-                curl -X POST -L -H "Authorization: Bearer YOUR_OAUTH_TOKEN" \
-                  -F "file=@$file" \
-                  "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
-              fi
-            done
-          fi
+          for file in dloa/*; do
+            if [ -f "$file" ]; then
+              extract_with_retries "$file"
+              # Проверка CRC32 хеша для каждого скачанного файла
+              FILE_CRC32=$(crc32 "$file")
+              echo "CRC32 для файла $file: $FILE_CRC32"
+            fi
+          done
 
-          # Upload to Yandex.Disk
-          if [[ "$upload_to_list" == *"yandex_disk"* ]]; then
-            echo "Uploading files to Yandex.Disk..."
-            for file in dloa/*; do
-              if [ -f "$file" ]; then
-                echo "Uploading file to Yandex.Disk: $file"
-                curl -X PUT -L -H "Authorization: OAuth $YANDEX_OAUTH_TOKEN" \
-                  -T "$file" \
-                  "https://cloud-api.yandex.net/v1/disk/resources/upload?path=/path/to/upload/$file"
-              fi
-            done
-          fi
-
-      - name: Final cleanup
+      - name: Create Release if it does not exist
         run: |
-          echo "Process completed!"
+          if ! gh release view "${{ inputs.tag }}" > /dev/null 2>&1; then
+            echo "Релиз с тегом ${{ inputs.tag }} не найден. Создаю новый релиз..."
+            gh release create "${{ inputs.tag }}" --title "Release ${inputs.tag}" --notes "Release notes" --target main
+          else
+            echo "Релиз ${{ inputs.tag }} уже существует."
+          fi
+
+      - name: Upload files to GitHub Release
+        run: |
+          echo "Загружаем файлы в GitHub Release..."
+          for file in dloa/*; do
+            if [ -f "$file" ]; then
+              echo "Загружаем файл: $file"
+              gh release upload "${{ inputs.tag }}" "$file" --clobber
+            fi
+          done
+
+      - name: Upload to Telegram (optional)
+        if: ${{ inputs.upload_destination == 'telegram' || inputs.upload_destination == 'both' }}
+        run: |
+          # Загрузка в Telegram (добавьте ваш токен и ID чата)
+          echo "Загружаем в Telegram..."
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument" -F document=@dloa/* -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Final message
+        run: |
+          echo "Процесс завершён."
