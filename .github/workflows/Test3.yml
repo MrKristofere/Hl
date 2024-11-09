@@ -1,0 +1,157 @@
+name: Download and Process Files
+on:
+  workflow_dispatch:
+    inputs:
+      upl:
+        description: 'Comma-separated list of URLs to download (e.g., http://example.com/file.zip)'
+        required: true
+        type: string
+      tag:
+        description: 'Tag for GitHub release (e.g., v1.0.0)'
+        required: true
+        type: string
+      parallel_downloads:
+        description: 'Number of parallel downloads (e.g., 3)'
+        required: true
+        type: string
+      upload_to:
+        description: |
+          'Comma-separated list of platforms to upload to. Choose from the following:
+          - github: Upload to GitHub release.
+          - telegram: Upload to Telegram bot.
+          - google_drive: Upload to Google Drive.
+          - yandex_disk: Upload to Yandex.Disk.
+          - both: Upload to both GitHub and Telegram.
+          - google_drive,yandex_disk: Upload to Google Drive and Yandex.Disk.
+          - etc.'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aria2 curl unzip p7zip-full jq
+          mkdir -p dloa  # Create download directory
+
+      - name: Validate input URLs
+        run: |
+          if [ -z "${{ inputs.upl }}" ]; then
+            echo "Error: No URLs provided for download."
+            exit 1
+          fi
+
+      - name: Validate parallel_downloads
+        run: |
+          # Ensure parallel_downloads is a positive integer
+          if ! [[ "${{ inputs.parallel_downloads }}" =~ ^[0-9]+$ ]] || [ "${{ inputs.parallel_downloads }}" -le 0 ]; then
+            echo "Error: parallel_downloads must be a positive integer."
+            exit 1
+          fi
+
+      - name: Prepare URL list
+        run: |
+          CLEANED_URLS=$(echo "${{ inputs.upl }}" | sed 's/ \+/ /g' | sed 's/ ,/,/g')
+          IFS=',' read -ra URLS <<< "$CLEANED_URLS"
+          echo "Number of URLs: ${#URLS[@]}"
+
+      - name: Download files
+        run: |
+          MAX_PARALLEL_DOWNLOADS=${{ inputs.parallel_downloads }}
+          RETRIES=3  # Maximum download retries
+          INITIAL_DELAY=2  # Initial delay in seconds
+          
+          download_with_retries() {
+            url=$1
+            retries=0
+            until aria2c -d dloa -x 16 -s 16 --continue=true "$url"; do
+              if (( retries >= RETRIES )); then
+                echo "Error: Failed to download file $url after $RETRIES attempts."
+                return 1
+              fi
+              retries=$((retries + 1))
+              sleep_time=$((INITIAL_DELAY ** retries))  # Exponential backoff
+              echo "Attempt $retries failed. Retrying in $sleep_time seconds."
+              sleep $sleep_time
+            done
+            return 0
+          }
+
+          COUNTER=0
+          for url in "${URLS[@]}"; do
+            download_with_retries "$url" &  # Run download in the background
+            COUNTER=$((COUNTER + 1))
+
+            # Handle parallel downloads
+            if (( COUNTER >= MAX_PARALLEL_DOWNLOADS )); then
+              echo "Reached maximum parallel downloads ($MAX_PARALLEL_DOWNLOADS), waiting for completion..."
+              wait  # Wait for all parallel downloads to finish
+              COUNTER=0
+            fi
+          done
+          wait  # Wait for remaining downloads to complete
+
+      - name: Upload files to selected platforms
+        run: |
+          upload_to_list=$(echo "${{ inputs.upload_to }}" | tr ',' '\n')
+
+          # Upload to GitHub
+          if [[ "$upload_to_list" == *"github"* ]]; then
+            echo "Uploading files to GitHub Releases..."
+            for file in dloa/*; do
+              if [ -f "$file" ]; then
+                echo "Uploading file to GitHub Release: $file"
+                gh release upload "${{ inputs.tag }}" "$file" --clobber
+              fi
+            done
+          fi
+
+          # Upload to Telegram
+          if [[ "$upload_to_list" == *"telegram"* ]]; then
+            echo "Uploading files to Telegram..."
+            for file in dloa/*; do
+              if [ -f "$file" ]; then
+                echo "Uploading file to Telegram: $file"
+                curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
+                  -F chat_id=$CHAT_ID \
+                  -F document=@"$file" \
+                  -F caption="Uploaded file: $(basename $file)"
+              fi
+            done
+          fi
+
+          # Upload to Google Drive
+          if [[ "$upload_to_list" == *"google_drive"* ]]; then
+            echo "Uploading files to Google Drive..."
+            for file in dloa/*; do
+              if [ -f "$file" ]; then
+                echo "Uploading file to Google Drive: $file"
+                curl -X POST -L -H "Authorization: Bearer YOUR_OAUTH_TOKEN" \
+                  -F "file=@$file" \
+                  "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
+              fi
+            done
+          fi
+
+          # Upload to Yandex.Disk
+          if [[ "$upload_to_list" == *"yandex_disk"* ]]; then
+            echo "Uploading files to Yandex.Disk..."
+            for file in dloa/*; do
+              if [ -f "$file" ]; then
+                echo "Uploading file to Yandex.Disk: $file"
+                curl -X PUT -L -H "Authorization: OAuth $YANDEX_OAUTH_TOKEN" \
+                  -T "$file" \
+                  "https://cloud-api.yandex.net/v1/disk/resources/upload?path=/path/to/upload/$file"
+              fi
+            done
+          fi
+
+      - name: Final cleanup
+        run: |
+          echo "Process completed!"
