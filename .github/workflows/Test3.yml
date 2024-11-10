@@ -14,76 +14,69 @@ on:
         description: 'Number of parallel downloads'
         required: true
         type: string
-      upload_destination:
-        description: 'Where to upload files (GitHub or Telegram or both)'
+      destination:
+        description: 'Choose where to upload the files (GitHub, Telegram, Mega, Google Drive, Dropbox)'
         required: true
-        type: choice
+        type: string
         options:
           - github
           - telegram
+          - mega
+          - google_drive
+          - dropbox
           - both
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
-  download:
+  download_and_process:
     runs-on: ubuntu-latest
     steps:
       - name: Setup
         run: |
           sudo apt-get update
           sudo apt-get install -y aria2 curl unzip p7zip-full jq
-          mkdir -p dloa  # Создаем каталог для загрузки
+          mkdir -p dloa  # Create a directory for downloads
 
       - name: Validate input URLs
         run: |
           if [ -z "${{ inputs.upl }}" ]; then
-            echo "Ошибка: не переданы URL для загрузки."
+            echo "Error: No URLs provided."
             exit 1
           fi
 
       - name: Validate parallel_downloads
         run: |
-          # Проверяем, что количество параллельных загрузок — это целое число больше 0
           if ! [[ "${{ inputs.parallel_downloads }}" =~ ^[0-9]+$ ]] || [ "${{ inputs.parallel_downloads }}" -le 0 ]; then
-            echo "Ошибка: параметр parallel_downloads должен быть положительным числом."
+            echo "Error: parallel_downloads must be a positive integer."
             exit 1
           fi
 
       - name: Prepare URL list
         run: |
-          # Убираем лишние пробелы перед и после запятых
           CLEANED_URLS=$(echo "${{ inputs.upl }}" | sed 's/ \+/ /g' | sed 's/ ,/,/g')
           IFS=',' read -ra URLS <<< "$CLEANED_URLS"
-          echo "Количество URL: ${#URLS[@]}"
-
-      - name: URL Encoding Function
-        run: |
-          encode_url() {
-            echo "$1" | jq -sRr @uri
-          }
-          export -f encode_url
+          echo "Number of URLs: ${#URLS[@]}"
 
       - name: Download files
         run: |
-          MAX_PARALLEL_DOWNLOADS=${{ inputs.parallel_downloads }}  # Получаем количество параллельных загрузок
-          RETRIES=3  # Максимальное количество попыток загрузки
-          INITIAL_DELAY=2  # Начальная задержка (сек)
-          
+          MAX_PARALLEL_DOWNLOADS=${{ inputs.parallel_downloads }}
+          RETRIES=3
+          INITIAL_DELAY=2
+
           download_with_retries() {
             url=$1
             retries=0
-            encoded_url=$(encode_url "$url")  # Кодируем URL
-
-            until aria2c -d dloa -x 16 -s 16 --continue=true "$encoded_url"; do
+            until aria2c -d dloa -x 16 -s 16 --continue=true "$url"; do
               if (( retries >= RETRIES )); then
-                echo "Ошибка: не удалось скачать файл $encoded_url после $RETRIES попыток."
+                echo "Error: Failed to download $url after $RETRIES attempts."
                 return 1
               fi
               retries=$((retries + 1))
-              sleep_time=$((INITIAL_DELAY ** retries))  # Экспоненциальная задержка
-              echo "Попытка скачивания $encoded_url не удалась. Повторная попытка ($retries из $RETRIES). Ожидание $sleep_time секунд."
+              sleep_time=$((INITIAL_DELAY ** retries))
+              echo "Retrying download of $url ($retries/$RETRIES). Waiting for $sleep_time seconds."
               sleep $sleep_time
             done
             return 0
@@ -91,17 +84,15 @@ jobs:
 
           COUNTER=0
           for url in "${URLS[@]}"; do
-            download_with_retries "$url" &  # Запускаем скачивание в фоновом режиме
+            download_with_retries "$url" & 
             COUNTER=$((COUNTER + 1))
-
-            # Управляем количеством параллельных загрузок
             if (( COUNTER >= MAX_PARALLEL_DOWNLOADS )); then
-              echo "Достигнут лимит параллельных загрузок ($MAX_PARALLEL_DOWNLOADS), ожидаем завершения..."
-              wait  # Ожидаем завершения всех параллельных загрузок
-              COUNTER=0  # Сброс счётчика параллельных загрузок
+              echo "Reached max parallel downloads ($MAX_PARALLEL_DOWNLOADS), waiting for completion..."
+              wait
+              COUNTER=0
             fi
           done
-          wait  # Ожидаем завершения всех оставшихся параллельных загрузок
+          wait
 
       - name: Extract and check CRC32 for downloaded files
         run: |
@@ -110,11 +101,11 @@ jobs:
             retries=0
             until [ -f "$file" ]; do
               if (( retries >= 3 )); then
-                echo "Ошибка: файл $file не существует или поврежден. Пропускаем."
+                echo "Error: File $file does not exist or is corrupted. Skipping."
                 return 1
               fi
               retries=$((retries + 1))
-              echo "Попытка извлечения файла $file не удалась. Повторная попытка ($retries из 3)."
+              echo "Retrying extraction of $file ($retries/3)."
               sleep 2
             done
 
@@ -127,48 +118,78 @@ jobs:
             elif [[ "$file" =~ \.rar$ ]]; then
               7z x "$file" -odloa
             else
-              echo "Неизвестный формат файла для разархивации: $file"
+              echo "Unknown file format for extraction: $file"
               return 1
             fi
-            rm "$file"  # Удаляем оригинальный архив
+            rm "$file"
             return 0
           }
 
           for file in dloa/*; do
             if [ -f "$file" ]; then
               extract_with_retries "$file"
-              # Проверка CRC32 хеша для каждого скачанного файла
               FILE_CRC32=$(crc32 "$file")
-              echo "CRC32 для файла $file: $FILE_CRC32"
+              echo "CRC32 for $file: $FILE_CRC32"
             fi
           done
 
-      - name: Create Release if it does not exist
+      - name: Upload to GitHub Release
+        if: ${{ inputs.destination == 'github' || inputs.destination == 'both' }}
         run: |
-          if ! gh release view "${{ inputs.tag }}" > /dev/null 2>&1; then
-            echo "Релиз с тегом ${{ inputs.tag }} не найден. Создаю новый релиз..."
-            gh release create "${{ inputs.tag }}" --title "Release ${inputs.tag}" --notes "Release notes" --target main
-          else
-            echo "Релиз ${{ inputs.tag }} уже существует."
-          fi
-
-      - name: Upload files to GitHub Release
-        run: |
-          echo "Загружаем файлы в GitHub Release..."
           for file in dloa/*; do
             if [ -f "$file" ]; then
-              echo "Загружаем файл: $file"
+              echo "Uploading $file to GitHub release."
               gh release upload "${{ inputs.tag }}" "$file" --clobber
             fi
           done
 
-      - name: Upload to Telegram (optional)
-        if: ${{ inputs.upload_destination == 'telegram' || inputs.upload_destination == 'both' }}
+      - name: Upload to Telegram
+        if: ${{ inputs.destination == 'telegram' || inputs.destination == 'both' }}
         run: |
-          # Загрузка в Telegram (добавьте ваш токен и ID чата)
-          echo "Загружаем в Telegram..."
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument" -F document=@dloa/* -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }}
+          for file in dloa/*; do
+            if [ -f "$file" ]; then
+              curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
+                -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+                -F document=@"$file"
+            fi
+          done
+          
+      - name: Upload to Mega.nz
+        if: ${{ inputs.destination == 'mega' || inputs.destination == 'both' }}
+        run: |
+          for file in dloa/*; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file to Mega.nz (placeholder)"
+              # Implement actual Mega API upload here
+            fi
+          done
+        env:
+          MEGA_API_KEY: ${{ secrets.MEGA_API_KEY }}
 
-      - name: Final message
+      - name: Upload to Google Drive
+        if: ${{ inputs.destination == 'google_drive' || inputs.destination == 'both' }}
         run: |
-          echo "Процесс завершён."
+          for file in dloa/*; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file to Google Drive (placeholder)"
+              # Implement actual Google Drive API upload here
+            fi
+          done
+        env:
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.GOOGLE_DRIVE_API_KEY }}
+
+      - name: Upload to Dropbox
+        if: ${{ inputs.destination == 'dropbox' || inputs.destination == 'both' }}
+        run: |
+          for file in dloa/*; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file to Dropbox (placeholder)"
+              # Implement actual Dropbox API upload here
+            fi
+          done
+        env:
+          DROPBOX_API_KEY: ${{ secrets.DROPBOX_API_KEY }}
+
+      - name: Final Message
+        run: |
+          echo "Files have been successfully uploaded to the chosen destinations."
