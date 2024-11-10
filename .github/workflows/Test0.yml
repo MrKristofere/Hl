@@ -45,11 +45,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ensure cache directories exist
-        run: |
-          mkdir -p /tmp/apt-cache
-          mkdir -p ~/.cache/pip
-
       - name: Create Dependency Files
         run: |
           echo "crc32c" > requirements.txt
@@ -58,65 +53,63 @@ jobs:
       - name: Calculate Cache Keys
         id: cache-keys
         run: |
+          echo "Generating cache keys for apt and pip dependencies..."
           apt_key=$(sha256sum apt-requirements.txt | awk '{print $1}')
           pip_key=$(sha256sum requirements.txt | awk '{print $1}')
           echo "apt_key=${apt_key}" >> $GITHUB_ENV
           echo "pip_key=${pip_key}" >> $GITHUB_ENV
+          echo "APT Cache Key: $apt_key"
+          echo "PIP Cache Key: $pip_key"
 
       - name: Cache apt-get dependencies
         uses: actions/cache@v4
         id: apt-cache
         with:
           path: /tmp/apt-cache
-          key: ${{ runner.os }}-apt-${{ env.apt_key }}
+          key: apt-cache-${{ env.apt_key }}
           restore-keys: |
-            ${{ runner.os }}-apt-
+            apt-cache-
 
       - name: Cache Python dependencies
         uses: actions/cache@v4
         id: pip-cache
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ env.pip_key }}
+          key: pip-cache-${{ env.pip_key }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            pip-cache-
 
-      - name: Check cache hit/miss and install dependencies if needed
+      - name: Install apt dependencies if needed
+        if: steps.apt-cache.outputs.cache-hit != 'true'
         run: |
-          if [ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" ]; then
-            echo "APT cache miss - installing dependencies."
-            sudo apt-get update && sudo apt-get install -y $(cat apt-requirements.txt)
-          else
-            echo "APT cache hit - dependencies installation skipped."
-          fi
-          
-          if [ "${{ steps.pip-cache.outputs.cache-hit }}" != "true" ]; then
-            echo "PIP cache miss - installing dependencies."
-            pip3 install -r requirements.txt
-          else
-            echo "PIP cache hit - dependencies installation skipped."
-          fi
+          echo "Installing apt dependencies..."
+          sudo apt-get update
+          sudo apt-get install -y $(cat apt-requirements.txt)
+          echo "APT dependencies installed."
 
-      - name: Download files (parallel)
+      - name: Install pip dependencies if needed
+        if: steps.pip-cache.outputs.cache-hit != 'true'
         run: |
-          echo "Downloading files..."
+          echo "Installing pip dependencies..."
+          pip3 install -r requirements.txt
+          echo "PIP dependencies installed."
+
+      - name: Download files
+        run: |
+          mkdir -p dloa
           IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
           for url in "${urls[@]}"; do
-            aria2c -d dloa -x 16 -s 16 --continue=true --max-connection-per-server=4 --split=16 --min-split-size=1M "$url" &
+            aria2c -d dloa -x 16 -s 16 --continue=true "$url" &
           done
           wait
-          echo "Files downloaded."
 
       - name: Verify downloaded files
         run: |
-          echo "Verifying downloaded files..."
           ls -lh dloa
-          echo "Downloaded files listed above."
 
       - name: Verify CRC32 checksum
         if: ${{ inputs.checksum == true }}
         run: |
-          echo "Verifying CRC32 checksums..."
           for file in dloa/*; do
             crc32_value=$(python3 -c "import zlib; print(f'{zlib.crc32(open(\"$file\", \"rb\").read()):08x}')")
             echo "File: $file, CRC32: $crc32_value"
