@@ -99,18 +99,6 @@ jobs:
           pip3 install -r requirements.txt
           echo "PIP dependencies installed."
 
-      - name: Reset caches if dependencies changed
-        run: |
-          echo "Checking for changes in requirements files and resetting cache if needed..."
-          if [ "${{ env.apt_key }}" != "$(cat /tmp/apt-cache/key.txt)" ]; then
-            echo "APT dependencies have changed, resetting cache."
-            rm -rf /tmp/apt-cache
-          fi
-          if [ "${{ env.pip_key }}" != "$(cat ~/.cache/pip/key.txt)" ]; then
-            echo "Pip dependencies have changed, resetting cache."
-            rm -rf ~/.cache/pip
-          fi
-          
       - name: Download files
         run: |
           mkdir -p dloa
