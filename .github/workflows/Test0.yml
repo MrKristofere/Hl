@@ -190,19 +190,37 @@ jobs:
                 done
                 ;;
               *.iso)
-                echo "Checking files without extracting..."
-                echo "Contents of ISO image: $file"
-                7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
-                  (
-                    echo "Extracting $filename from ISO and calculating CRC32"
+                iso_file=$(find dloa -type f -name "*.iso" | head -n 1)
+          if [[ -z "$iso_file" ]]; then
+            echo "ISO file not found in dloa or its subdirectories."
+          else
+            echo "ISO file found: $iso_file"
+            echo "iso_file=$iso_file" >> $GITHUB_ENV
+          fi
 
-                    # Используем 7z для извлечения файла в стандартный вывод и передаем его в Python для вычисления CRC32
-                    crc32_value=$(7z e "$file" -so "$filename" | python3 -c "import zlib, sys; print(f'{zlib.crc32(sys.stdin.buffer.read()) & 0xffffffff:08x}')")
+      - name: Calculate CRC32 of contents if ISO is found
+        if: env.iso_file
+        run: |
+          iso_file="${{ env.iso_file }}"
+          echo "Checking files and directories in ISO image: $iso_file"
 
-                    echo "File: $filename, CRC32: $crc32_value"
-                  ) &
-                done
-                wait
+          # Чтение списка файлов и каталогов внутри ISO
+          7z l "$iso_file" | awk 'NR>3 && !/----/ && !/^$/ {print $6, $3}' | while read filename type; do
+            if [[ "$type" == "D" ]]; then
+              # Вывод информации о каталоге
+              echo "$filename/ : Directory"
+            else
+              # Обработка файла: вычисление CRC32
+              echo "Extracting $filename from ISO and calculating CRC32"
+              crc32_value=$(7z e "$iso_file" -so "$filename" 2>/dev/null | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}' if data else 'error')")
+              if [[ "$crc32_value" == "error" ]]; then
+                echo "Failed to calculate CRC32 for $filename" >&2
+              else
+                echo "$filename : CRC32 = $crc32_value"
+              fi
+            fi
+          done
+
                 ;;
               *.img)
                 echo "Checking partitions in IMG file: $file"
