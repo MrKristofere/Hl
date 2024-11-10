@@ -1,4 +1,4 @@
-name: Upload file (test)
+name: Upload file (тест)
 on:
   workflow_dispatch:
     inputs:
@@ -22,17 +22,29 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      # Update the package list
-      - name: Update Package List
+      # Cache APT packages to speed up builds
+      - name: Cache APT Packages
+        uses: actions/cache@v2
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-${{ hashFiles('**/apt-packages.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
+      # Create a file listing the required packages
+      - name: Create APT Packages List
+        run: |
+          echo "aria2" >> apt-packages.txt
+          echo "curl" >> apt-packages.txt
+          echo "unzip" >> apt-packages.txt
+          echo "p7zip-full" >> apt-packages.txt
+          echo "crc32" >> apt-packages.txt
+
+      # Update the package list and install required dependencies if not cached
+      - name: Install Dependencies
         run: |
           sudo apt-get update
-
-      # Cache the aria2 package for faster builds
-      - name: Cache APT Packages
-        uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: aria2
-          version: 1.0
+          xargs -a apt-packages.txt sudo apt-get install -y
 
       # Download files in parallel using aria2c
       - name: Download Files
