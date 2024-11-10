@@ -243,17 +243,17 @@ jobs:
                 done
                 ;;
                *.iso)
-                 echo "Contents of ISO image: $file"
-                 # List files in ISO using 7z
-                 7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
-                   if [[ -n "$filename" ]]; then
-                   # Calculate CRC32 for each file in ISO
-                     crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib; import sys; data=sys.stdin.read(); print(f'{zlib.crc32(data.encode('utf-8')) & 0xffffffff:08x}')")
-                     echo "File: $filename, CRC32: $crc32_value"
-                   else
-                     echo "Skipping empty or non-existing file: $filename"
-                   fi
-                 done
+                echo "Contents of ISO image: $file"
+                # List files in ISO using 7z
+                7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
+                  if [[ -n "$filename" ]]; then
+                        # Calculate CRC32 for each file in ISO
+                    crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib; import sys; data=sys.stdin.read(); print(f'{zlib.crc32(data.encode(\"utf-8\")) & 0xffffffff:08x}')")
+                    echo "File: $filename, CRC32: $crc32_value"
+                  else
+                    echo "Skipping empty or non-existing file: $filename"
+                  fi
+                done
                 ;;
               *.img)
                 echo "Contents of IMG file: $file"
