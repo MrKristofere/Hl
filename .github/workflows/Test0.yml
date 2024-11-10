@@ -101,54 +101,82 @@ jobs:
               *.tar.*)
                 echo "Contents of TAR archive: $file"
                 tar -tf "$file" | while read filename; do
-                  echo "Filename: '$filename'"
-                  # Убираем пробелы и проверяем пустое ли имя
-                  filename=$(echo "$filename" | xargs)
-                  if [ -z "$filename" ] || [ ! -e "$filename" ]; then
-                    echo "Skipping empty or non-existing file: '$filename'"
+                  # Skip empty or invalid filenames
+                  if [ -z "$filename" ]; then
                     continue
                   fi
                   crc32_value=$(tar -xOf "$file" "$filename" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
-                  echo "File: $filename, CRC32: $crc32_value"
+                  if [ "$crc32_value" != "00000000" ]; then
+                    echo "File: $filename, CRC32: $crc32_value"
+                  fi
                 done
                 ;;
               *.zip)
                 echo "Contents of ZIP archive: $file"
                 unzip -l "$file" | awk 'NR>3 {print $4}' | while read filename; do
-                  echo "Filename: '$filename'"
-                  filename=$(echo "$filename" | xargs)
-                  if [ -z "$filename" ] || [ ! -e "$filename" ]; then
-                    echo "Skipping empty or non-existing file: '$filename'"
+                  # Skip empty or invalid filenames
+                  if [ -z "$filename" ]; then
                     continue
                   fi
                   crc32_value=$(unzip -p "$file" "$filename" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
-                  echo "File: $filename, CRC32: $crc32_value"
+                  if [ "$crc32_value" != "00000000" ]; then
+                    echo "File: $filename, CRC32: $crc32_value"
+                  fi
                 done
                 ;;
               *.rar)
                 echo "Contents of RAR archive: $file"
                 7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
-                  echo "Filename: '$filename'"
-                  filename=$(echo "$filename" | xargs)
-                  if [ -z "$filename" ] || [ ! -e "$filename" ]; then
-                    echo "Skipping empty or non-existing file: '$filename'"
+                  # Skip empty or invalid filenames
+                  if [ -z "$filename" ]; then
                     continue
                   fi
                   crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
-                  echo "File: $filename, CRC32: $crc32_value"
+                  if [ "$crc32_value" != "00000000" ]; then
+                    echo "File: $filename, CRC32: $crc32_value"
+                  fi
+                done
+                ;;
+              *.7z)
+                echo "Contents of 7z archive: $file"
+                7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
+                  # Skip empty or invalid filenames
+                  if [ -z "$filename" ]; then
+                    continue
+                  fi
+                  crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
+                  if [ "$crc32_value" != "00000000" ]; then
+                    echo "File: $filename, CRC32: $crc32_value"
+                  fi
                 done
                 ;;
               *.iso)
                 echo "Checking ISO contents: $file"
                 7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
-                  echo "Filename: '$filename'"
-                  filename=$(echo "$filename" | xargs)
-                  if [ -z "$filename" ] || [ ! -e "$filename" ]; then
-                    echo "Skipping empty or non-existing file: '$filename'"
+                  # Skip empty or invalid filenames
+                  if [ -z "$filename" ]; then
                     continue
                   fi
                   crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
-                  echo "File: $filename, CRC32: $crc32_value"
+                  if [ "$crc32_value" != "00000000" ]; then
+                    echo "File: $filename, CRC32: $crc32_value"
+                  fi
+                done
+                ;;
+              *.img)
+                echo "Checking IMG contents: $file"
+                mmls "$file" | awk '/\bUnallocated\b/ {next} {print $NF}' | while read partition; do
+                  fls -r -p "$file" "$partition" | while read filepath; do
+                    # Skip empty or invalid filenames
+                    if [ -z "$filepath" ]; then
+                      continue
+                    fi
+                    echo "Extracting $filepath from IMG and calculating CRC32"
+                    crc32_value=$(icat "$file" "$filepath" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
+                    if [ "$crc32_value" != "00000000" ]; then
+                      echo "File: $filepath, CRC32: $crc32_value"
+                    fi
+                  done
                 done
                 ;;
               *)
