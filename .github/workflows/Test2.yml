@@ -44,17 +44,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Кеширование apt-get зависимостей
+      # Создаём временные файлы зависимостей
+      - name: Create temporary dependency files
+        run: |
+          echo "aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils python3-pip genisoimage" > apt-requirements.txt
+          echo "crc32c" > requirements.txt
+
+      # Кешируем apt-get зависимости
       - name: Cache apt-get dependencies
         id: apt-cache
         uses: actions/cache@v3
         with:
           path: /tmp/apt-cache
-          key: ${{ runner.os }}-apt-${{ hashFiles('**/apt-requirements.txt') }}
+          key: ${{ runner.os }}-apt-${{ hashFiles('apt-requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-apt-
 
-      # Кеширование Python зависимостей
+      # Кешируем Python зависимости
       - name: Cache Python dependencies
         id: pip-cache
         uses: actions/cache@v3
@@ -64,14 +70,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Установка зависимостей (если кеш не найден)
-      - name: Install dependencies
-        if: ${{ steps.apt-cache.outputs.cache-hit != 'true' || steps.pip-cache.outputs.cache-hit != 'true' }}
+      # Установка apt-get зависимостей (только если кеш не найден)
+      - name: Install apt dependencies
+        if: steps.apt-cache.outputs.cache-hit != 'true'
         run: |
-          echo "Installing dependencies..."
-          sudo apt-get update && sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils python3-pip genisoimage
-          pip3 install crc32c
-          echo "Dependencies installed."
+          echo "Installing apt dependencies..."
+          sudo apt-get update && sudo apt-get install -y $(cat apt-requirements.txt)
+          echo "apt dependencies installed."
+
+      # Установка Python зависимостей (только если кеш не найден)
+      - name: Install Python dependencies
+        if: steps.pip-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "Installing Python dependencies..."
+          pip3 install -r requirements.txt
+          echo "Python dependencies installed."
+
+      # Удаление временных файлов
+      - name: Clean up temporary files
+        run: |
+          rm apt-requirements.txt requirements.txt
 
       # Скачать файлы
       - name: Download files (parallel)
@@ -84,12 +102,14 @@ jobs:
           wait
           echo "Files downloaded."
 
+      # Верификация скачанных файлов
       - name: Verify downloaded files
         run: |
           echo "Verifying downloaded files..."
           ls -lh dloa
           echo "Downloaded files listed above."
 
+      # Проверка CRC32
       - name: Verify CRC32 checksum
         if: ${{ inputs.checksum == true }}
         run: |
@@ -125,6 +145,7 @@ jobs:
             echo "No compression selected."
           fi
 
+      # Загрузка файлов на GitHub Release
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -133,6 +154,7 @@ jobs:
             dloa_compressed.*
           tag_name: ${{ inputs.tag }}
 
+      # Подтверждение загрузки
       - name: Confirm Upload
         run: |
           echo "Files uploaded to GitHub Release."
