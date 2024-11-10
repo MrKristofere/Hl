@@ -52,7 +52,6 @@ jobs:
 
       - name: Cache apt dependencies
         id: apt-cache
-        uses: actions/checkout@v4
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage cdrtools tar arj cabextract python3-pip
