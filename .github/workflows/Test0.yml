@@ -45,33 +45,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Убедитесь, что директории для кеша существуют
       - name: Ensure cache directories exist
         run: |
           mkdir -p /tmp/apt-cache
           mkdir -p ~/.cache/pip
 
-      # Кеширование apt-get зависимостей
       - name: Cache apt-get dependencies
         id: apt-cache
         uses: actions/cache@v4
         with:
           path: /tmp/apt-cache
-          key: ${{ runner.os }}-apt-${{ hashFiles('apt-requirements.txt') }}  # Кешируем по хешу apt-requirements.txt
+          key: ${{ runner.os }}-apt-${{ hashFiles('apt-requirements.txt') }}  # Убедитесь, что зависимость от apt-requirements.txt
           restore-keys: |
             ${{ runner.os }}-apt-
 
-      # Кеширование Python зависимостей
       - name: Cache Python dependencies
         id: pip-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}  # Кешируем по хешу requirements.txt
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}  # Убедитесь, что зависимость от requirements.txt
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Установка зависимостей (если кеш не найден)
+      - name: Debug cache hit/miss
+        run: |
+          echo "Apt Cache Hit: ${{ steps.apt-cache.outputs.cache-hit }}"
+          echo "Pip Cache Hit: ${{ steps.pip-cache.outputs.cache-hit }}"
+
       - name: Install dependencies
         if: steps.apt-cache.outputs.cache-hit != 'true' || steps.pip-cache.outputs.cache-hit != 'true'
         run: |
