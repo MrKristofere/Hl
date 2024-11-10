@@ -50,12 +50,21 @@ jobs:
           mkdir -p /tmp/apt-cache
           mkdir -p ~/.cache/pip
 
+      - name: Calculate Cache Keys
+        id: cache-keys
+        run: |
+          echo "Calculating hash for requirements files..."
+          apt_key=$(sha256sum apt-requirements.txt | awk '{print $1}')
+          pip_key=$(sha256sum requirements.txt | awk '{print $1}')
+          echo "apt_key=${apt_key}" >> $GITHUB_ENV
+          echo "pip_key=${pip_key}" >> $GITHUB_ENV
+
       - name: Cache apt-get dependencies
         id: apt-cache
         uses: actions/cache@v4
         with:
           path: /tmp/apt-cache
-          key: ${{ runner.os }}-apt-${{ hashFiles('apt-requirements.txt') }}  # Ключ зависит от apt-requirements.txt
+          key: ${{ runner.os }}-apt-${{ env.apt_key }}
           restore-keys: |
             ${{ runner.os }}-apt-
 
@@ -64,7 +73,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}  # Ключ зависит от requirements.txt
+          key: ${{ runner.os }}-pip-${{ env.pip_key }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -80,7 +89,7 @@ jobs:
           echo "crc32c" > requirements.txt
           echo "aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage tar arj cabextract python3" > apt-requirements.txt
           
-          # Если кэш не найден, устанавливаем зависимости
+          # Install only if cache miss
           if [ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" ]; then
             echo "Installing apt dependencies..."
             sudo apt-get update
