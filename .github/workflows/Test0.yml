@@ -192,9 +192,12 @@ jobs:
               *.iso)
                 echo "Contents of ISO image: $file"
                 isoinfo -i "$file" -l | awk 'NR>1 {print $1}' | while read filename; do
+                  (
                   echo "Extracting $filename from ISO and calculating CRC32"
-                  crc32_value=$(isoinfo -i "$file" -x "$filename" | python3 -c "import zlib, sys; print(f'{zlib.crc32(sys.stdin.buffer.read()) & 0xffffffff:08x}')")
+                  # Use xorriso to extract file data and calculate CRC32
+                  crc32_value=$(xorriso -osirrox on -indev "$file" -extract "$filename" - | python3 -c "import zlib, sys; print(f'{zlib.crc32(sys.stdin.buffer.read()) & 0xffffffff:08x}')")
                   echo "File: $filename, CRC32: $crc32_value"
+                  ) &
                 done
                 ;;
               *.img)
