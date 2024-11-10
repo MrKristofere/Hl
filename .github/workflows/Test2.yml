@@ -44,13 +44,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install dependencies
-        run: |
-          echo "Installing dependencies..."
-          sudo apt-get update && sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils python3-pip genisoimage
-          pip3 install crc32c
-          echo "Dependencies installed."
-
+      # Кеширование apt-get зависимостей
       - name: Cache apt-get dependencies
         id: apt-cache
         uses: actions/cache@v3
@@ -60,6 +54,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-apt-
 
+      # Кеширование Python зависимостей
       - name: Cache Python dependencies
         id: pip-cache
         uses: actions/cache@v3
@@ -69,12 +64,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
+      # Установка зависимостей (если кеш не найден)
+      - name: Install dependencies
+        if: ${{ steps.apt-cache.outputs.cache-hit != 'true' || steps.pip-cache.outputs.cache-hit != 'true' }}
+        run: |
+          echo "Installing dependencies..."
+          sudo apt-get update && sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils python3-pip genisoimage
+          pip3 install crc32c
+          echo "Dependencies installed."
+
+      # Скачать файлы
       - name: Download files (parallel)
         run: |
           echo "Downloading files..."
           IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
           for url in "${urls[@]}"; do
-            # Use aria2c with better parallelism settings
             aria2c -d dloa -x 16 -s 16 --continue=true --max-connection-per-server=4 --split=16 --min-split-size=1M "$url" &
           done
           wait
@@ -95,6 +99,7 @@ jobs:
             echo "File: $file, CRC32: $crc32_value"
           done
 
+      # Извлечение и сжатие файлов
       - name: Extract and compress files
         run: |
           echo "Extracting files..."
