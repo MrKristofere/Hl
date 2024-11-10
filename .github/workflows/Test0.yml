@@ -48,18 +48,14 @@ jobs:
     # Убедитесь, что директории для кеша существуют
       - name: Ensure cache directories exist
         run: |
-          mkdir -p /tmp/apt-cache
           mkdir -p ~/.cache/pip
 
-      # Кеширование apt-get зависимостей
-      - name: Cache apt-get dependencies
+      - name: Cache apt dependencies
         id: apt-cache
-        uses: actions/cache@v4
+      - uses: actions/checkout@v2
+      - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          path: /tmp/apt-cache
-          key: ${{ runner.os }}-apt-${{ hashFiles('**/*') }}  # Мы будем использовать хеш всех файлов в репозитории
-          restore-keys: |
-            ${{ runner.os }}-apt-
+          packages: aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage cdrtools tar arj cabextract python3-pip
 
       # Кеширование Python зависимостей
       - name: Cache Python dependencies
