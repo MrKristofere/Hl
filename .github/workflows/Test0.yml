@@ -242,9 +242,22 @@ jobs:
                 fi
               done
               ;;
+             *.iso)
+              echo "Contents of ISO image: $file"
+              # List files in ISO using 7z
+              7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
+                if [[ -n "$filename" ]]; then
+                  # Calculate CRC32 for each file in ISO
+                  crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+                  echo "File: $filename, CRC32: $crc32_value"
+                else
+                  echo "Skipping empty or non-existing file: $filename"
+                fi
+              done
+              ;;
             *.img)
               echo "Contents of IMG file: $file"
-              # Пример использования mount для IMG образов
+              # Example using mount for IMG files
               mkdir -p /tmp/img_mount
               sudo mount -o loop "$file" /tmp/img_mount
               ls /tmp/img_mount | while read filename; do
@@ -259,29 +272,10 @@ jobs:
               rmdir /tmp/img_mount
               ;;
             *)
-              echo "Skipping unsupported file type: $file
+              echo "Skipping unsupported file type: $file"
               ;;
           esac
-        done
-        ;;      
-              *.iso)
-                echo "Contents of ISO image: $file"
-                # List files in ISO using 7z
-                7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
-                  if [[ -n "$filename" ]]; then
-                    # Calculate CRC32 for each file in ISO
-                    crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
-                    echo "File: $filename, CRC32: $crc32_value"
-                  else
-                    echo "Skipping empty or non-existing file: $filename"
-                  fi
-                done
-                ;;
-              *)
-                echo "Skipping unsupported file type: $file"
-                ;;
-            esac
-          done       
+        done       
 
       - name: File compression archive
         run: |          
