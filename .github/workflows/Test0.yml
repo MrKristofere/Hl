@@ -58,42 +58,62 @@ jobs:
       - name: Calculate Cache Keys
         id: cache-keys
         run: |
-          echo "Calculating cache keys based on dependency files..."
+          echo "Generating cache keys for apt and pip dependencies..."
           apt_key=$(sha256sum apt-requirements.txt | awk '{print $1}')
           pip_key=$(sha256sum requirements.txt | awk '{print $1}')
-          echo "apt_key=apt-cache-${apt_key}" >> $GITHUB_ENV
-          echo "pip_key=pip-cache-${pip_key}" >> $GITHUB_ENV
+          echo "apt_key=${apt_key}" >> $GITHUB_ENV
+          echo "pip_key=${pip_key}" >> $GITHUB_ENV
+          echo "APT Cache Key: $apt_key"
+          echo "PIP Cache Key: $pip_key"
 
       - name: Cache apt dependencies
         uses: actions/cache@v4
         id: apt-cache
         with:
           path: /tmp/apt-cache
-          key: ${{ env.apt_key }}
+          key: apt-cache-${{ env.apt_key }}
           restore-keys: |
             apt-cache-
 
-      - name: Cache pip dependencies
+      - name: Cache Python dependencies
         uses: actions/cache@v4
         id: pip-cache
         with:
           path: ~/.cache/pip
-          key: ${{ env.pip_key }}
+          key: pip-cache-${{ env.pip_key }}
           restore-keys: |
             pip-cache-
 
-      - name: Install apt dependencies if cache miss
+      - name: Install apt dependencies if needed
         if: steps.apt-cache.outputs.cache-hit != 'true'
         run: |
-          echo "Installing apt dependencies from scratch..."
+          echo "Installing apt dependencies..."
           sudo apt-get update
           sudo apt-get install -y $(cat apt-requirements.txt)
+          echo "APT dependencies installed."
 
-      - name: Install pip dependencies if cache miss
+      - name: Install pip dependencies if needed
         if: steps.pip-cache.outputs.cache-hit != 'true'
         run: |
-          echo "Installing pip dependencies from scratch..."
+          echo "Installing pip dependencies..."
           pip3 install -r requirements.txt
+          echo "PIP dependencies installed."
+
+      - name: Create temporary files cache
+        run: |
+          echo "Checking for temporary files for caching..."
+          mkdir -p /tmp/apt-cache/.tmp /tmp/pip-cache/.tmp
+
+      - name: Cleanup Cache
+        run: |
+          echo "Cleaning up old caches..."
+          if [ -d "/tmp/apt-cache" ]; then
+            rm -rf /tmp/apt-cache
+          fi
+          if [ -d "~/.cache/pip" ]; then
+            rm -rf ~/.cache/pip
+          fi
+          echo "Old caches cleaned."
 
       - name: Download files
         run: |
