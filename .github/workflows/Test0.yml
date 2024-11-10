@@ -58,54 +58,42 @@ jobs:
       - name: Calculate Cache Keys
         id: cache-keys
         run: |
-          echo "Generating cache keys for apt and pip dependencies..."
+          echo "Calculating cache keys based on dependency files..."
           apt_key=$(sha256sum apt-requirements.txt | awk '{print $1}')
           pip_key=$(sha256sum requirements.txt | awk '{print $1}')
-          echo "apt_key=${apt_key}" >> $GITHUB_ENV
-          echo "pip_key=${pip_key}" >> $GITHUB_ENV
-          echo "APT Cache Key: $apt_key"
-          echo "PIP Cache Key: $pip_key"
+          echo "apt_key=apt-cache-${apt_key}" >> $GITHUB_ENV
+          echo "pip_key=pip-cache-${pip_key}" >> $GITHUB_ENV
 
-      - name: Cache apt-get dependencies
+      - name: Cache apt dependencies
         uses: actions/cache@v4
         id: apt-cache
         with:
           path: /tmp/apt-cache
-          key: apt-cache-${{ env.apt_key }}
+          key: ${{ env.apt_key }}
           restore-keys: |
             apt-cache-
 
-      - name: Cache Python dependencies
+      - name: Cache pip dependencies
         uses: actions/cache@v4
         id: pip-cache
         with:
           path: ~/.cache/pip
-          key: pip-cache-${{ env.pip_key }}
+          key: ${{ env.pip_key }}
           restore-keys: |
             pip-cache-
 
-      - name: Check for Cache Updates
-        run: |
-          if [[ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" || "${{ steps.pip-cache.outputs.cache-hit }}" != "true" ]]; then
-            echo "Dependencies have changed or cache is missing. Rebuilding cache..."
-          else
-            echo "No dependency changes detected. Using cached dependencies."
-          fi
-
-      - name: Install apt dependencies if needed
+      - name: Install apt dependencies if cache miss
         if: steps.apt-cache.outputs.cache-hit != 'true'
         run: |
-          echo "Installing apt dependencies..."
+          echo "Installing apt dependencies from scratch..."
           sudo apt-get update
           sudo apt-get install -y $(cat apt-requirements.txt)
-          echo "APT dependencies installed."
 
-      - name: Install pip dependencies if needed
+      - name: Install pip dependencies if cache miss
         if: steps.pip-cache.outputs.cache-hit != 'true'
         run: |
-          echo "Installing pip dependencies..."
+          echo "Installing pip dependencies from scratch..."
           pip3 install -r requirements.txt
-          echo "PIP dependencies installed."
 
       - name: Download files
         run: |
