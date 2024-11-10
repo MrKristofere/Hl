@@ -1,77 +1,131 @@
-name: Upload file
+name: File Download, Compression, Hashing, and Upload
 on:
   workflow_dispatch:
     inputs:
       upl:
-        description: 'URL file'
+        description: 'Comma-separated URLs for download'
         required: true
         type: string
       tag:
-        description: 'Tag'
+        description: 'Tag for release'
         required: true
         type: string
-      compress:
-        description: 'Compression type (none, zip, tar, 7z)'
+      compression:
+        description: 'Compression option (none, gzip, bzip2, xz)'
         required: false
         type: string
-      compression_level:
-        description: 'Compression level (1-9)'
+      compress_level:
+        description: 'Compression level (1-9), default 6'
         required: false
-        type: string
-      parallel_downloads:
-        description: 'Number of parallel downloads'
-        required: true
-        type: string
+        type: number
+        default: 6
+      checksum:
+        description: 'Enable CRC32 checksum verification (true or false)'
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: write
+  id-token: write
+  actions: read
 
 jobs:
-  upload:
+  download_compress_and_upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up environment
+      - name: Set up dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y aria2 curl jq unzip p7zip-full
+          sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils python3-pip
+          pip3 install crc32c
+
+      - name: Process URLs and Parallel Download
+        run: |
+          IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
           
-      - name: Download files
-        run: |
-          aria2c -d dloa -x 16 -s 16 --continue=true "${{ inputs.upl }}"
-          if [ $? -ne 0 ]; then
-            echo "Ошибка при скачивании файла"
-            exit 1
-          fi
+          download_commands=()
+          for url in "${urls[@]}"; do
+            encoded_url=$(echo "$url" | sed 's/,/%2C/g')
+            download_commands+=( "aria2c -d dloa -x 16 -s 16 --continue=true --max-connection-per-server=4 '$encoded_url' &" )
+          done
 
-      - name: Extract and check CRC32 for downloaded files
-        run: |
-          if [ -d "dloa" ]; then
-            for file in dloa/*; do
-              if [ -f "$file" ]; then
-                # Проверка CRC32
-                FILE_CRC32=$(crc32 "$file")
-                echo "CRC32 для файла $file: $FILE_CRC32"
-                
-                # Разархивация
-                if [[ "$file" =~ \.zip$ ]]; then
-                  unzip -q "$file" -d dloa/
-                elif [[ "$file" =~ \.tar\.gz$ ]]; then
-                  tar -xzvf "$file" -C dloa/
-                elif [[ "$file" =~ \.tar$ ]]; then
-                  tar -xvf "$file" -C dloa/
-                elif [[ "$file" =~ \.rar$ ]]; then
-                  7z x "$file" -odloa
-                fi
-              fi
-            done
-          else
-            echo "Ошибка: каталог dloa не существует или пуст."
-            exit 1
-          fi
+          for cmd in "${download_commands[@]}"; do
+            eval "$cmd"
+          done
 
-      - name: Upload Release
+          # Wait for all downloads to finish
+          wait
+
+      - name: Show downloaded files
+        run: |
+          echo "Downloaded files:"
+          ls -lh dloa
+
+      - name: Verify CRC32 checksums
+        if: ${{ inputs.checksum == true }}
+        run: |
+          echo "Verifying CRC32 checksums..."
+          for file in dloa/*; do
+            crc32_value=$(crc32c "$file")
+            echo "File: $file, CRC32: $crc32_value"
+          done
+
+      - name: Extract and check files in archives or images
+        run: |
+          echo "Checking for archives and images in downloaded files..."
+          for file in dloa/*; do
+            if [[ "$file" == *.tar.gz || "$file" == *.zip || "$file" == *.tar.bz2 || "$file" == *.tar.xz ]]; then
+              echo "Extracting archive: $file"
+              mkdir -p "dloa/$(basename "$file" .${file##*.})"
+              case $file in
+                *.zip) unzip -q "$file" -d "dloa/$(basename "$file" .zip)" ;;
+                *.tar.gz) tar -xvzf "$file" -C "dloa/$(basename "$file" .tar.gz)" ;;
+                *.tar.bz2) tar -xvjf "$file" -C "dloa/$(basename "$file" .tar.bz2)" ;;
+                *.tar.xz) tar -xvJf "$file" -C "dloa/$(basename "$file" .tar.xz)" ;;
+              esac
+              # Compute CRC32 for files inside the archive
+              for inner_file in "dloa/$(basename "$file" .${file##*.})"/*; do
+                inner_crc32=$(crc32c "$inner_file")
+                echo "Inside archive: $inner_file, CRC32: $inner_crc32"
+              done
+            elif [[ "$file" == *.iso ]]; then
+              echo "ISO image detected: $file"
+              # For ISO files, show contents (using isoinfo)
+              mkdir -p "dloa/iso_contents"
+              isoinfo -i "$file" -l > "dloa/iso_contents/contents.txt"
+              cat "dloa/iso_contents/contents.txt"
+              # Compute CRC32 for files inside the ISO
+              for iso_file in $(isoinfo -i "$file" -l | awk '{print $9}'); do
+                iso_crc32=$(crc32c "$iso_file")
+                echo "Inside ISO: $iso_file, CRC32: $iso_crc32"
+              done
+            fi
+          done
+
+      - name: Compress files (if selected)
+        if: ${{ inputs.compression != 'none' }}
+        run: |
+          echo "Compressing files..."
+          compression_format="${{ inputs.compression }}"
+          compression_level="${{ inputs.compress_level }}"
+          
+          case $compression_format in
+            gzip) tar -cvzf "dloa_compressed.tar.gz" -C dloa . ;;
+            bzip2) tar -cvjf "dloa_compressed.tar.bz2" -C dloa . ;;
+            xz) tar -cvJf "dloa_compressed.tar.xz" -C dloa . ;;
+            *)
+              echo "No valid compression format specified. Skipping compression."
+              ;;
+          esac
+          echo "Compression done."
+
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dloa/*
+          files: |
+            dloa/*
+            dloa_compressed.tar.gz
+            dloa_compressed.tar.bz2
+            dloa_compressed.tar.xz
           tag_name: ${{ inputs.tag }}
-        if: success()
