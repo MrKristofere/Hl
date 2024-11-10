@@ -63,15 +63,16 @@ jobs:
           ls -lh dloa
 
       - name: Verify CRC32 checksums
-        if: ${{ inputs.checksum == true }}
-        run: |
-          echo "Verifying CRC32 checksums..."
-          
-          # Python script to compute CRC32
-          for file in dloa/*; do
-            crc32_value=$(python3 -c "import zlib; print(f'{zlib.crc32(open('$file', 'rb').read()):08x}')")
-            echo "File: $file, CRC32: $crc32_value"
-          done
+  if: ${{ inputs.checksum == true }}
+  run: |
+    echo "Verifying CRC32 checksums..."
+    
+    # Python script to compute CRC32
+    for file in dloa/*; do
+      # Use double quotes for bash, and escape single quotes in Python code
+      crc32_value=$(python3 -c "import zlib; print(f'{zlib.crc32(open(\"$file\", \"rb\").read()):08x}')")
+      echo "File: $file, CRC32: $crc32_value"
+    done
 
       - name: Extract and check files in archives or images
         run: |
