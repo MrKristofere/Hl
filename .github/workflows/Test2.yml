@@ -1,4 +1,4 @@
-name: Download, Compress, Upload, and Lose Our Minds 💥🌪️
+name: Download (all cache)
 
 on:
   workflow_dispatch:
