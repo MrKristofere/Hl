@@ -1,102 +1,159 @@
-name: Upload file (тест)
+name: Upload Files (тепт)
 on:
   workflow_dispatch:
     inputs:
       upl:
-        description: 'Comma-separated URLs of files to download'
+        description: 'Comma-separated list of URLs (HTTP, FTP, SFTP, Metalink, BitTorrent)'
         required: true
         type: string
       tag:
-        description: 'Tag for the release'
+        description: 'Release Tag'
         required: true
         type: string
       compress:
-        description: 'Compress files before upload (true/false)'
+        description: 'Compression type (none, zip, tar, 7z)'
+        required: true
+        type: string
+      compression_level:
+        description: 'Compression level (1-9)'
         required: false
-        type: boolean
+        type: string
+      archive_password:
+        description: 'Password for encrypted archives (optional)'
+        required: false
+        type: string
+      parallel_downloads:
+        description: 'Number of parallel downloads'
+        required: true
+        type: string
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   upload:
     runs-on: ubuntu-latest
+
     steps:
-      # Cache APT packages to speed up builds
-      - name: Cache APT Packages
-        uses: actions/cache@v2
-        with:
-          path: /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-${{ hashFiles('**/apt-packages.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-apt-
-
-      # Create a file listing the required packages
-      - name: Create APT Packages List
-        run: |
-          echo "aria2" >> apt-packages.txt
-          echo "curl" >> apt-packages.txt
-          echo "unzip" >> apt-packages.txt
-          echo "p7zip-full" >> apt-packages.txt
-          echo "crc32" >> apt-packages.txt
-
-      # Update the package list and install required dependencies if not cached
-      - name: Install Dependencies
+      # Устанавливаем зависимости и утилиты
+      - name: Update and install dependencies
         run: |
           sudo apt-get update
-          xargs -a apt-packages.txt sudo apt-get install -y
+          sudo apt-get install -y aria2 crc32 unzip p7zip-full gzip wget curl git lftp
 
-      # Download files in parallel using aria2c
-      - name: Download Files
+      # Проверка входных данных
+      - name: Validate Inputs
         run: |
-          IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
-          for url in "${urls[@]}"; do
-            aria2c --no-check-certificate -d dloa "$url" &
-          done
-          wait  # Wait for all background jobs to finish
-
-      # Function to calculate CRC-32 checksum
-      - name: Calculate CRC-32 Checksums
-        id: crc32_check
-        run: |
-          cd dloa || exit 1
-          for file in *; do
-            if [ -f "$file" ]; then
-              crc32 "$file" >> ../checksums.txt  # Store checksums in a file
-            fi
-            
-            # If the file is a zip archive, unzip it and calculate CRC-32 for the extracted files
-            if [[ "$file" == *.zip ]]; then
-              unzip "$file" -d "${file%.zip}" && cd "${file%.zip}" || continue
-              for inner_file in *; do
-                crc32 "$inner_file" >> ../../checksums.txt  # Store checksums of extracted files
-              done
-              cd ..  # Go back to the parent directory after processing the archive
-            fi
-          done
-
-      # Optionally compress files before uploading them to the release
-      - name: Compress Files (if selected)
-        if: ${{ inputs.compress == 'true' }}
-        run: |
-          tar -czf dloa.tar.gz -C dloa .
-
-      # Upload Release with calculated checksums and optionally compressed files 
-      - name: Upload Release in Parallel
-        run: |
-          FILES_TO_UPLOAD="dloa/*"
-          if [ "${{ inputs.compress }}" == "true" ]; then 
-            FILES_TO_UPLOAD="$FILES_TO_UPLOAD dloa.tar.gz"
+          # Проверяем, что список URL не пустой
+          if [ -z "${{ inputs.upl }}" ]; then
+            echo "Ошибка: не переданы URL для загрузки."
+            exit 1
           fi
-
-          # Upload checksums.txt as well if it exists 
-          if [ -f "checksums.txt" ]; then 
-            FILES_TO_UPLOAD="$FILES_TO_UPLOAD checksums.txt"
-          fi
-
-          for file in $FILES_TO_UPLOAD; do 
-            echo "Uploading $file..."
-            gh release upload "${{ inputs.tag }}" "$file" --clobber &  # Upload each file in background 
-          done 
           
-          wait  # Wait for all background uploads to finish
+          # Проверяем, что количество параллельных загрузок — это целое число больше 0
+          if ! [[ "${{ inputs.parallel_downloads }}" =~ ^[0-9]+$ ]] || [ "${{ inputs.parallel_downloads }}" -le 0 ]; then
+            echo "Ошибка: параметр parallel_downloads должен быть положительным числом."
+            exit 1
+          fi
+
+      # Подготовка URL-списка для скачивания
+      - name: Prepare URL list
+        run: |
+          CLEANED_URLS=$(echo "${{ inputs.upl }}" | sed 's/ \+/ /g' | sed 's/ ,/,/g')
+          IFS=',' read -ra URLS <<< "$CLEANED_URLS"
+          echo "Количество URL: ${#URLS[@]}"
+
+      # Скачивание файлов с поддержкой параллельных загрузок
+      - name: Download files
+        run: |
+          MAX_PARALLEL_DOWNLOADS=${{ inputs.parallel_downloads }}  # Получаем количество параллельных загрузок
+          RETRIES=3  # Максимальное количество попыток загрузки
+          INITIAL_DELAY=2  # Начальная задержка (сек)
+
+          # Функция для скачивания с попытками
+          download_with_retries() {
+            url=$1
+            retries=0
+            until aria2c -d dloa -x 16 -s 16 --continue=true "$url"; do
+              if (( retries >= RETRIES )); then
+                echo "Ошибка: не удалось скачать файл $url после $RETRIES попыток."
+                return 1
+              fi
+              retries=$((retries + 1))
+              sleep_time=$((INITIAL_DELAY ** retries))  # Экспоненциальная задержка
+              echo "Попытка скачивания $url не удалась. Повторная попытка ($retries из $RETRIES). Ожидание $sleep_time секунд."
+              sleep $sleep_time
+            done
+            return 0
+          }
+
+          COUNTER=0
+          for url in "${URLS[@]}"; do
+            download_with_retries "$url" &  # Запускаем скачивание в фоновом режиме
+            COUNTER=$((COUNTER + 1))
+
+            # Управляем количеством параллельных загрузок
+            if (( COUNTER >= MAX_PARALLEL_DOWNLOADS )); then
+              echo "Достигнут лимит параллельных загрузок ($MAX_PARALLEL_DOWNLOADS), ожидаем завершения..."
+              wait  # Ожидаем завершения всех параллельных загрузок
+              COUNTER=0  # Сброс счётчика параллельных загрузок
+            fi
+          done
+          wait  # Ожидаем завершения всех оставшихся параллельных загрузок
+
+      # Проверка CRC32 для скачанных файлов
+      - name: Check CRC32
+        run: |
+          for file in dloa/*; do
+            if [ -f "$file" ]; then
+              FILE_CRC32=$(crc32 "$file")
+              echo "CRC32 для файла $file: $FILE_CRC32"
+              # Пример: Вы можете сравнить с ожидаемой контрольной суммой, если она известна
+              # Например, EXPECTED_CRC32="12345678"
+              # if [ "$EXPECTED_CRC32" != "$FILE_CRC32" ]; then
+              #   echo "Ошибка: контрольная сумма файла не совпадает!"
+              #   exit 1
+              # fi
+            fi
+          done
+
+      # Разархивация файлов и вывод содержимого архивов/образов
+      - name: Extract archives and show contents
+        run: |
+          for file in dloa/*; do
+            if [ -f "$file" ]; then
+              if [[ "$file" =~ \.zip$ ]]; then
+                unzip -l "$file"  # Показываем содержимое архива
+                unzip -q "$file" -d dloa/  # Разархивируем
+              elif [[ "$file" =~ \.tar\.gz$ ]]; then
+                tar -tzf "$file"  # Показываем содержимое архива
+                tar -xzf "$file" -C dloa/  # Разархивируем
+              elif [[ "$file" =~ \.iso$ ]]; then
+                # Например, для ISO-образа можно использовать команду mount или другие утилиты
+                echo "ISO-образ: $file"  # Пример вывода содержимого ISO
+              fi
+            fi
+          done
+
+      # Сжатие файлов перед загрузкой, если указано
+      - name: Compress files
+        run: |
+          for file in dloa/*; do
+            if [ -f "$file" ]; then
+              if [[ "${{ inputs.compress }}" == "zip" ]]; then
+                zip -r "dloa/$file.zip" "$file"  # Сжимаем в zip
+              elif [[ "${{ inputs.compress }}" == "tar" ]]; then
+                tar -czvf "dloa/$file.tar.gz" "$file"  # Сжимаем в tar.gz
+              elif [[ "${{ inputs.compress }}" == "7z" ]]; then
+                7z a "dloa/$file.7z" "$file"  # Сжимаем в 7z
+              fi
+            fi
+          done
+
+      # Загрузка файлов в релиз GitHub
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dloa/*
+          tag_name: ${{ inputs.tag }}
