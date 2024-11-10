@@ -63,7 +63,7 @@ jobs:
       # Кеширование Python зависимостей
       - name: Cache Python dependencies
         id: pip-cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/*') }}  # Аналогично для pip
@@ -75,7 +75,7 @@ jobs:
         if: steps.apt-cache.outputs.cache-hit != 'true' || steps.pip-cache.outputs.cache-hit != 'true'
         run: |
           echo "Installing apt dependencies..."
-          sudo apt-get update && sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils python3-pip genisoimage
+          sudo apt-get update && sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync rar gzip bzip2 xz-utils python3-pip genisoimage
           echo "Installing pip dependencies..."
           pip3 install crc32c
           echo "Dependencies installed."
