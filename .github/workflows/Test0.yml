@@ -50,21 +50,23 @@ jobs:
           mkdir -p /tmp/apt-cache
           mkdir -p ~/.cache/pip
 
+      # Кешируем apt зависимости
       - name: Cache apt-get dependencies
         id: apt-cache
         uses: actions/cache@v4
         with:
           path: /tmp/apt-cache
-          key: ${{ runner.os }}-apt-${{ hashFiles('apt-requirements.txt') }}  # Ключ зависит от apt-requirements.txt
+          key: ${{ runner.os }}-apt-${{ hashFiles('apt-requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-apt-
 
+      # Кешируем Python зависимости
       - name: Cache Python dependencies
         id: pip-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}  # Ключ зависит от requirements.txt
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -73,28 +75,51 @@ jobs:
           echo "Apt Cache Hit: ${{ steps.apt-cache.outputs.cache-hit }}"
           echo "Pip Cache Hit: ${{ steps.pip-cache.outputs.cache-hit }}"
 
-      - name: Install dependencies
-        if: steps.apt-cache.outputs.cache-hit != 'true' || steps.pip-cache.outputs.cache-hit != 'true'
+      # Устанавливаем APT зависимости (только новые пакеты)
+      - name: Install apt dependencies (only new packages)
+        if: steps.apt-cache.outputs.cache-hit != 'true'
         run: |
-          echo "Creating requirements files..."
-          echo "crc32c" > requirements.txt
-          echo "aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage tar arj cabextract python3" > apt-requirements.txt
+          echo "---------------------------------------------------"
+          echo "Checking and installing missing APT dependencies..."
+          sudo apt-get update
           
-          # Если кэш не найден, устанавливаем зависимости
-          if [ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" ]; then
-            echo "Installing apt dependencies..."
-            sudo apt-get update
-            sudo apt-get install -y $(cat apt-requirements.txt)
-          else
-            echo "APT dependencies cache hit, skipping installation."
-          fi
+          # Прямо прописаны зависимости для APT
+          apt_dependencies=("aria2" "curl" "jq" "unzip" "p7zip-full" "rsync" "zip" "gzip" "bzip2" "xz-utils" "parted" "genisoimage" "tar" "arj" "cabextract" "python3")
 
-          if [ "${{ steps.pip-cache.outputs.cache-hit }}" != "true" ]; then
-            echo "Installing pip dependencies..."
-            pip3 install -r requirements.txt
-          else
-            echo "Pip dependencies cache hit, skipping installation."
-          fi
+          for pkg in "${apt_dependencies[@]}"; do
+            if ! dpkg -l | grep -qw "$pkg"; then
+              echo "APT Dependency $pkg is NOT installed. Installing..."
+              sudo apt-get install -y $pkg
+            else
+              echo "APT Dependency $pkg is already installed. Skipping..."
+            fi
+          done
+          echo "---------------------------------------------------"
+          echo "APT dependencies installation complete."
+
+      # Устанавливаем PIP зависимости (только новые пакеты)
+      - name: Install pip dependencies (only new packages)
+        if: steps.pip-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "---------------------------------------------------"
+          echo "Checking and installing missing PIP dependencies..."
+          
+          # Прямо прописаны зависимости для PIP
+          pip_dependencies=("crc32c" "requests" "pyyaml")
+
+          installed_pip_packages=$(pip3 freeze)
+          for pkg in "${pip_dependencies[@]}"; do
+            if ! echo "$installed_pip_packages" | grep -q "$pkg"; then
+              echo "PIP Dependency $pkg is NOT installed. Installing..."
+              pip3 install "$pkg"
+            else
+              echo "PIP Dependency $pkg is already installed. Skipping..."
+            fi
+          done
+          echo "---------------------------------------------------"
+          echo "PIP dependencies installation complete."
+
+      # Дальше идут другие шаги вашего процесса...
 
       - name: Download files (parallel)
         run: |
@@ -193,6 +218,7 @@ jobs:
             fi
           done
 
+      # Архивируем файлы с учетом выбранной компрессии
       - name: File compression archive
         run: |          
           echo "Compressing files..."
@@ -209,6 +235,7 @@ jobs:
             echo "No compression selected."
           fi
 
+      # Загружаем файлы на GitHub Release
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
