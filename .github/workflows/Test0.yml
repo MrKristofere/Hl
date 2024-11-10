@@ -76,7 +76,7 @@ jobs:
         if: steps.apt-cache.outputs.cache-hit != 'true' || steps.pip-cache.outputs.cache-hit != 'true'
         run: |
           echo "Installing apt dependencies..."
-          sudo apt-get update && sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage tar arj cabextract python3-pip
+          sudo apt-get update && sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage cdrtools tar arj cabextract python3-pip
           echo "Installing pip dependencies..."
           pip3 install crc32c
           echo "Dependencies installed."
@@ -103,76 +103,119 @@ jobs:
           done
 
       - name: Check files
-        run: |
-          echo "Checking files without extracting..."
-          for file in dloa/*; do
-            case $file in
-              *.tar.*)
-                echo "Contents of TAR archive: $file"
-                tar -tf "$file"
-                ;;
-              *.zip)
-                echo "Contents of ZIP archive: $file"
-                unzip -l "$file"
-                ;;
-              *.rar)
-                echo "Contents of RAR archive: $file"
-                7z l "$file"
-                ;;
-              *.7z)
-                echo "Contents of 7z archive: $file"
-                7z l "$file"
-                ;;
-              *.tar.gz|*.tgz)
-                echo "Contents of TAR.GZ archive: $file"
-                tar -tzf "$file"
-                ;;
-              *.tar.bz2)
-                echo "Contents of TAR.BZ2 archive: $file"
-                tar -tjf "$file"
-                ;;
-              *.tar.xz)
-                echo "Contents of TAR.XZ archive: $file"
-                tar -tJf "$file"
-                ;;
-              *.tar.Z)
-                echo "Contents of TAR.Z archive: $file"
-                tar -tZf "$file"
-                ;;
-              *.arj)
-                echo "Contents of ARJ archive: $file"
-                arj v "$file"
-                ;;
-              *.cab)
-                echo "Contents of CAB archive: $file"
-                cabextract -l "$file"
-                ;;
-              *.xz)
-                echo "Contents of XZ archive: $file"
-                xz -l "$file"
-                ;;
-              *.gz)
-                echo "Contents of GZ archive: $file"
-                gzip -l "$file"
-                ;;
-              *.bz2)
-                echo "Contents of BZ2 archive: $file"
-                bzip2 -l "$file"
-                ;;
-              *.iso)
-                echo "Contents of ISO image: $file"
-                isoinfo -i "$file" -l
-                ;;
-              *.img)
-                echo "Checking partitions in IMG file: $file"
-                parted "$file" print
-                ;;
-            esac
-            if [ -f "$file" ]; then
-              crc32_value=$(python3 -c "import zlib; print(f'{zlib.crc32(open(\"$file\", \"rb\").read()):08x}')")
-              echo "File: $file, CRC32: $crc32_value"
-            fi
+  run: |
+    echo "Checking files without extracting..."
+    for file in dloa/*; do
+      case $file in
+        *.tar.*)
+          echo "Contents of TAR archive: $file"
+          tar -tf "$file" | while read filename; do
+            crc32_value=$(tar -xOf "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
           done
+          ;;
+        *.zip)
+          echo "Contents of ZIP archive: $file"
+          unzip -l "$file" | awk 'NR>3 {print $4}' | while read filename; do
+            crc32_value=$(unzip -p "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.rar)
+          echo "Contents of RAR archive: $file"
+          7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
+            crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.7z)
+          echo "Contents of 7z archive: $file"
+          7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
+            crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.tar.gz|*.tgz)
+          echo "Contents of TAR.GZ archive: $file"
+          tar -tzf "$file" | while read filename; do
+            crc32_value=$(tar -xOf "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.tar.bz2)
+          echo "Contents of TAR.BZ2 archive: $file"
+          tar -tjf "$file" | while read filename; do
+            crc32_value=$(tar -xOf "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.tar.xz)
+          echo "Contents of TAR.XZ archive: $file"
+          tar -tJf "$file" | while read filename; do
+            crc32_value=$(tar -xOf "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.tar.Z)
+          echo "Contents of TAR.Z archive: $file"
+          tar -tZf "$file" | while read filename; do
+            crc32_value=$(tar -xOf "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.arj)
+          echo "Contents of ARJ archive: $file"
+          arj v "$file" | awk 'NR>2 {print $NF}' | while read filename; do
+            crc32_value=$(arj x -y -o/tmp "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.cab)
+          echo "Contents of CAB archive: $file"
+          cabextract -l "$file" | awk 'NR>1 {print $1}' | while read filename; do
+            crc32_value=$(cabextract -q "$file" "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.xz)
+          echo "Contents of XZ archive: $file"
+          xz -l "$file" | while read filename; do
+            crc32_value=$(xz -dc "$file" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.gz)
+          echo "Contents of GZ archive: $file"
+          gzip -l "$file" | while read filename; do
+            crc32_value=$(gzip -dc "$file" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.bz2)
+          echo "Contents of BZ2 archive: $file"
+          bzip2 -l "$file" | while read filename; do
+            crc32_value=$(bzip2 -dc "$file" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.iso)
+          echo "Contents of ISO image: $file"
+          isoinfo -i "$file" -l | awk 'NR>1 {print $1}' | while read filename; do
+            crc32_value=$(isoinfo -i "$file" -x "$filename" | python3 -c "import zlib; import sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+            echo "File: $filename, CRC32: $crc32_value"
+          done
+          ;;
+        *.img)
+          echo "Checking partitions in IMG file: $file"
+          parted "$file" print
+          ;;
+      esac
+      # Проверка CRC32 для обычных файлов
+      if [ -f "$file" ]; then
+        crc32_value=$(python3 -c "import zlib; print(f'{zlib.crc32(open(\"$file\", \"rb\").read()) & 0xffffffff:08x}')")
+        echo "File: $file, CRC32: $crc32_value"
+      fi
+    done
 
       - name: File compression archive
         run: |          
