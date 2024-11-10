@@ -45,7 +45,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # Убедитесь, что директории для кеша существуют
       - name: Ensure cache directories exist
         run: |
           mkdir -p ~/.cache/pip
