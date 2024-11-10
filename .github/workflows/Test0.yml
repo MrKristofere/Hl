@@ -54,7 +54,7 @@ jobs:
       # Кеширование apt-get зависимостей
       - name: Cache apt-get dependencies
         id: apt-cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /tmp/apt-cache
           key: ${{ runner.os }}-apt-${{ hashFiles('**/*') }}  # Мы будем использовать хеш всех файлов в репозитории
