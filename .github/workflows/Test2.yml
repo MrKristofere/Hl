@@ -3,15 +3,15 @@ on:
   workflow_dispatch:
     inputs:
       upl:
-        description: 'Comma-separated URLs... or are they just fleeting moments in the void of time? ⏳💭'
+        description: 'Comma-separated URLs'
         required: true
         type: string
       tag:
-        description: 'Tag... but is it really a tag? Or a fleeting memory of something that never existed? 🏷️🌀'
+        description: 'Tag'
         required: true
         type: string
       compression:
-        description: 'Compression? Are we just squeezing life out of data or trying to save our souls? 🔮'
+        description: 'Compression method'
         required: false
         type: choice
         options:
@@ -23,12 +23,12 @@ on:
           - 7z
           - zip
       compress_level:
-        description: 'Compression level (1-9) — or is it really just about how much of us we’re willing to lose? 🔪'
+        description: 'Compression level (1-9)'
         required: false
         type: number
         default: 6
       checksum:
-        description: 'CRC32 checksum? But can we really trust anything in this world? 🤔💀'
+        description: 'Enable CRC32 checksum verification'
         required: false
         type: boolean
         default: true
@@ -42,51 +42,38 @@ jobs:
   download_compress_and_upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies... or perhaps just embrace the void? 🌚
+      - name: Install dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils python3-pip genisoimage
+          sudo apt-get update
+          sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils python3-pip genisoimage
           pip3 install crc32c
-          echo "The dependencies are installed... or are they? 🌀🕳️"
+          echo "Dependencies installed."
 
-      - name: Download URLs — Are we downloading files or are they downloading us? 🔄💭
+      - name: Download files
         run: |
           IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
-          
-          download_commands=()
-          for url in "${urls[@]}"; do
-            encoded_url=$(echo "$url" | sed 's/,/%2C/g')
-            download_commands+=( "aria2c -d dloa -x 16 -s 16 --continue=true --max-connection-per-server=4 '$encoded_url' &" )
-          done
-
-          for cmd in "${download_commands[@]}"; do
-            eval "$cmd"
-          done
-
-          # Wait for all downloads to finish
+          aria2c -d dloa -x 16 -s 16 --continue=true --max-connection-per-server=4 "${urls[@]}" &
           wait
 
-      - name: Show me what we've downloaded — or is it what the data wanted us to see? 🫣
+      - name: Verify downloads
         run: |
-          echo "Files? But are they really files or just fragments of a shattered reality? 🔮"
+          echo "Downloaded files:"
           ls -lh dloa
 
-      - name: Verify CRC32 — Because even numbers can lie to us... or are we the ones lying? 🤐
+      - name: Verify CRC32 checksum
         if: ${{ inputs.checksum == true }}
         run: |
-          echo "Verifying CRC32 checksums... or perhaps verifying our own sanity? 💀"
-    
-          # Python script for CRC32 — a ritual of trust in a world full of deceiving bits 👁️
+          echo "Verifying CRC32 checksums..."
+          # Python script for CRC32 — a ritual of trust in a world full of deceiving bits
           for file in dloa/*; do
             crc32_value=$(python3 -c "import zlib; print(f'{zlib.crc32(open(\"$file\", \"rb\").read()):08x}')")
-            echo "File: $file, CRC32: $crc32_value — but do we truly know what a checksum is? 🤷‍♂️"
+            echo "File: $file, CRC32: $crc32_value"
           done
 
-      - name: Extract files — What is extraction? The peeling away of layers, or a journey inward? 🧠
+      - name: Extract files
         run: |
-          echo "Extracting... or are we simply deconstructing our existence, one archive at a time? 🔍"
           for file in dloa/*; do
             if [[ "$file" == *.tar.gz || "$file" == *.zip || "$file" == *.tar.bz2 || "$file" == *.tar.xz || "$file" == *.rar || "$file" == *.7z ]]; then
-              echo "Extracting archive: $file"
               mkdir -p "dloa/$(basename "$file" .${file##*.})"
               case $file in
                 *.zip) 7z x "$file" -o"dloa/$(basename "$file" .zip)" ;;
@@ -97,34 +84,26 @@ jobs:
                 *.tar.xz) tar -xvJf "$file" -C "dloa/$(basename "$file" .tar.xz)" ;;
               esac
             elif [[ "$file" == *.iso ]]; then
-              echo "ISO detected: $file"
               mkdir -p "dloa/iso_contents"
               isoinfo -i "$file" -l > "dloa/iso_contents/contents.txt"
               cat "dloa/iso_contents/contents.txt"
             fi
           done
 
-      - name: Compress files — Or are we just trying to put everything into a tiny box to make it all fit? 🔒🌀
+      - name: Compress files
         if: ${{ inputs.compression != 'none' }}
         run: |
-          echo "Compression... what are we really compressing here? The files, or our feelings? 💔"
-          compression_format="${{ inputs.compression }}"
-          compression_level="${{ inputs.compress_level }}"
-          
-          case $compression_format in
+          case ${{ inputs.compression }} in
             gzip) tar -cvzf "dloa_compressed.tar.gz" -C dloa . ;;
             bzip2) tar -cvjf "dloa_compressed.tar.bz2" -C dloa . ;;
             xz) tar -cvJf "dloa_compressed.tar.xz" -C dloa . ;;
-            rar) 7z a -m0=rar -mx${compression_level} "dloa_compressed.rar" "dloa/*" ;; 
-            7z) 7z a -mx${compression_level} "dloa_compressed.7z" "dloa/*" ;;
-            zip) 7z a -tzip -mx${compression_level} "dloa_compressed.zip" "dloa/*" ;;  
-            *)
-              echo "Compression is an illusion... or is it? 💀🌀"
-              ;;
+            rar) 7z a -m0=rar -mx${{ inputs.compress_level }} "dloa_compressed.rar" "dloa/*" ;; 
+            7z) 7z a -mx${{ inputs.compress_level }} "dloa_compressed.7z" "dloa/*" ;;
+            zip) 7z a -tzip -mx${{ inputs.compress_level }} "dloa_compressed.zip" "dloa/*" ;;  
+            *) echo "No compression selected." ;;
           esac
-          echo "Compression complete... or was it just the beginning of a deeper descent? 🔮"
 
-      - name: Upload to GitHub Release — Is this the end? Or are we releasing ourselves into the unknown? 🌠
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
