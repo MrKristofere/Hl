@@ -66,8 +66,13 @@ jobs:
         if: ${{ inputs.checksum == true }}
         run: |
           echo "Verifying CRC32 checksums..."
+          
+          # Install the crc32c library
+          pip3 install crc32c
+
+          # Python script to compute CRC32C
           for file in dloa/*; do
-            crc32_value=$(crc32c "$file")
+            crc32_value=$(python3 -c "import crc32c; print(crc32c.crc32c(open('$file', 'rb').read()))")
             echo "File: $file, CRC32: $crc32_value"
           done
 
