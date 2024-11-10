@@ -40,7 +40,8 @@ permissions:
   actions: read
 
 jobs:
-  download_compress_and_upload:
+  Upload_Files:
+    name: 'Upload Files'
     runs-on: ubuntu-latest
 
     steps:
