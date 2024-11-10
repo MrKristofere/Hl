@@ -58,15 +58,14 @@ jobs:
       - name: Calculate Cache Keys
         id: cache-keys
         run: |
-          echo "Calculating hash for requirements files..."
           apt_key=$(sha256sum apt-requirements.txt | awk '{print $1}')
           pip_key=$(sha256sum requirements.txt | awk '{print $1}')
           echo "apt_key=${apt_key}" >> $GITHUB_ENV
           echo "pip_key=${pip_key}" >> $GITHUB_ENV
 
       - name: Cache apt-get dependencies
-        id: apt-cache
         uses: actions/cache@v4
+        id: apt-cache
         with:
           path: /tmp/apt-cache
           key: ${{ runner.os }}-apt-${{ env.apt_key }}
@@ -74,35 +73,28 @@ jobs:
             ${{ runner.os }}-apt-
 
       - name: Cache Python dependencies
-        id: pip-cache
         uses: actions/cache@v4
+        id: pip-cache
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ env.pip_key }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Debug cache hit/miss
-        run: |
-          echo "Apt Cache Hit: ${{ steps.apt-cache.outputs.cache-hit }}"
-          echo "Pip Cache Hit: ${{ steps.pip-cache.outputs.cache-hit }}"
-
-      - name: Install dependencies
-        if: steps.apt-cache.outputs.cache-hit != 'true' || steps.pip-cache.outputs.cache-hit != 'true'
+      - name: Check cache hit/miss and install dependencies if needed
         run: |
           if [ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" ]; then
-            echo "Installing apt dependencies..."
-            sudo apt-get update
-            sudo apt-get install -y $(cat apt-requirements.txt)
+            echo "APT cache miss - installing dependencies."
+            sudo apt-get update && sudo apt-get install -y $(cat apt-requirements.txt)
           else
-            echo "APT dependencies cache hit, skipping installation."
+            echo "APT cache hit - dependencies installation skipped."
           fi
-
+          
           if [ "${{ steps.pip-cache.outputs.cache-hit }}" != "true" ]; then
-            echo "Installing pip dependencies..."
+            echo "PIP cache miss - installing dependencies."
             pip3 install -r requirements.txt
           else
-            echo "Pip dependencies cache hit, skipping installation."
+            echo "PIP cache hit - dependencies installation skipped."
           fi
 
       - name: Download files (parallel)
