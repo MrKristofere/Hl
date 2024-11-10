@@ -67,6 +67,7 @@ jobs:
 
       # Установка зависимостей (если кеш не найден)
       - name: Install dependencies
+        run: |
         if: steps.pip-cache.outputs.cache-hit != 'true'
           echo "Installing pip dependencies..."
           pip3 install crc32c
