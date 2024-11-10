@@ -53,7 +53,9 @@ jobs:
         run: |
           echo "Downloading files..."
           IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
-          for url in "${urls[@]}"; do aria2c -d dloa -x 16 -s 16 --continue=true --max-connection-per-server=4 "$url" & done
+          for url in "${urls[@]}"; do
+            aria2c -d dloa -x 16 -s 16 --continue=true --max-connection-per-server=4 "$url" &
+          done
           wait
           echo "Files downloaded."
 
@@ -83,17 +85,16 @@ jobs:
             esac
           done
           
+          echo "Compressing files..."
           if [ "${{ inputs.compression }}" != "none" ]; then
-            echo "Compressing files..."
-            compression_cmd="tar -cvf dloa_compressed.${{ inputs.compression }} -C dloa ."
-            [[ "${{ inputs.compression }}" == "gzip" ]] && compression_cmd="tar -cvzf dloa_compressed.tar.gz -C dloa ."
-            [[ "${{ inputs.compression }}" == "bzip2" ]] && compression_cmd="tar -cvjf dloa_compressed.tar.bz2 -C dloa ."
-            [[ "${{ inputs.compression }}" == "xz" ]] && compression_cmd="tar -cvJf dloa_compressed.tar.xz -C dloa ."
-            [[ "${{ inputs.compression }}" == "rar" ]] && compression_cmd="7z a -m0=rar -mx${{ inputs.compress_level }} dloa_compressed.rar dloa/*"
-            [[ "${{ inputs.compression }}" == "7z" ]] && compression_cmd="7z a -mx${{ inputs.compress_level }} dloa_compressed.7z dloa/*"
-            [[ "${{ inputs.compression }}" == "zip" ]] && compression_cmd="7z a -tzip -mx${{ inputs.compress_level }} dloa_compressed.zip dloa/*"
-            $compression_cmd
-            echo "Files compressed."
+            case "${{ inputs.compression }}" in
+              gzip) tar -cvzf "dloa_compressed.tar.gz" -C dloa . ;;
+              bzip2) tar -cvjf "dloa_compressed.tar.bz2" -C dloa . ;;
+              xz) tar -cvJf "dloa_compressed.tar.xz" -C dloa . ;;
+              rar) 7z a -m0=rar -mx${{ inputs.compress_level }} "dloa_compressed.rar" "dloa/*" ;; 
+              7z) 7z a -mx${{ inputs.compress_level }} "dloa_compressed.7z" "dloa/*" ;;
+              zip) 7z a -tzip -mx${{ inputs.compress_level }} "dloa_compressed.zip" "dloa/*" ;;
+            esac
           else
             echo "No compression selected."
           fi
