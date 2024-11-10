@@ -55,7 +55,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/apt-cache
-          key: ${{ runner.os }}-apt-${{ hashFiles('apt-requirements.txt') }}  # Ключ зависит от apt-requirements.txt
+          key: ${{ runner.os }}-apt-${{ hashFiles('apt-requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-apt-
 
@@ -64,7 +64,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}  # Ключ зависит от requirements.txt
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -73,28 +73,38 @@ jobs:
           echo "Apt Cache Hit: ${{ steps.apt-cache.outputs.cache-hit }}"
           echo "Pip Cache Hit: ${{ steps.pip-cache.outputs.cache-hit }}"
 
-      - name: Install dependencies
-        if: steps.apt-cache.outputs.cache-hit != 'true' || steps.pip-cache.outputs.cache-hit != 'true'
+      - name: Install missing apt dependencies
         run: |
-          echo "Creating requirements files..."
-          echo "crc32c" > requirements.txt
+          echo "Preparing apt requirements..."
           echo "aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage tar arj cabextract python3" > apt-requirements.txt
-          
-          # Если кэш не найден, устанавливаем зависимости
-          if [ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" ]; then
-            echo "Installing apt dependencies..."
-            sudo apt-get update
-            sudo apt-get install -y $(cat apt-requirements.txt)
-          else
-            echo "APT dependencies cache hit, skipping installation."
-          fi
+          echo "Checking and installing missing apt dependencies..."
 
-          if [ "${{ steps.pip-cache.outputs.cache-hit }}" != "true" ]; then
-            echo "Installing pip dependencies..."
-            pip3 install -r requirements.txt
-          else
-            echo "Pip dependencies cache hit, skipping installation."
-          fi
+          for pkg in $(cat apt-requirements.txt); do
+            if ! dpkg -s "$pkg" &> /dev/null; then
+              echo "Installing missing package: $pkg"
+              sudo apt-get update && sudo apt-get install -y "$pkg"
+            else
+              echo "$pkg is already installed, skipping..."
+            fi
+          done
+          echo "APT dependencies installed."
+
+      - name: Install missing pip dependencies
+        run: |
+          echo "Preparing pip requirements..."
+          echo "crc32c" > requirements.txt
+          echo "Checking and installing missing pip dependencies..."
+
+          installed_packages=$(pip3 freeze)
+          for pkg in $(cat requirements.txt); do
+            if ! echo "$installed_packages" | grep -q "$pkg"; then
+              echo "Installing missing pip package: $pkg"
+              pip3 install "$pkg"
+            else
+              echo "$pkg is already installed, skipping..."
+            fi
+          done
+          echo "Pip dependencies installed."
 
       - name: Download files (parallel)
         run: |
