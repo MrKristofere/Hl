@@ -1,21 +1,19 @@
-name: Upload file (test ver.)
-
+name: Upload file (test)
 on:
   workflow_dispatch:
     inputs:
       upl:
-        description: 'Comma-separated list of URLs'
+        description: 'Comma-separated URLs of files to download'
         required: true
         type: string
       tag:
-        description: 'Tag'
+        description: 'Tag for the release'
         required: true
         type: string
       compress:
-        description: 'Compress files before uploading'
+        description: 'Compress files before upload (true/false)'
         required: false
         type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -23,65 +21,70 @@ permissions:
 jobs:
   upload:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Update package list
+      # Update the package list
+      - name: Update Package List
         run: |
           sudo apt-get update
 
-      - name: Cache apt packages
+      # Cache the aria2 package for faster builds
+      - name: Cache APT Packages
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: aria2, unzip, p7zip-full
+          packages: aria2
           version: 1.0
 
-      - name: Download files
+      # Download files in parallel using aria2c
+      - name: Download Files
         run: |
-          mkdir -p dloa
-          # Параллельная загрузка файлов
-          for url in ${{ inputs.upl }}; do
-            aria2c -d dloa -x 16 -s 16 --continue=true "$url" &
+          IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
+          for url in "${urls[@]}"; do
+            aria2c --no-check-certificate -d dloa "$url" &
           done
-          wait # Ждём, пока все загрузки завершатся
+          wait  # Wait for all background jobs to finish
 
-      - name: Verify CRC-32 checksums
+      # Function to calculate CRC-32 checksum
+      - name: Calculate CRC-32 Checksums
+        id: crc32_check
         run: |
-          # Проверка CRC-32 для каждого файла в папке dloa
-          for file in dloa/*; do
-            checksum=$(crc32 "$file")
-            echo "CRC-32 checksum for $file: $checksum"
-            # Можно добавить проверку с заранее заданным CRC-32, если это необходимо
-          done
-
-      - name: Extract archives if needed
-        run: |
-          # Процесс разархивирования файлов, если это архивы
-          for file in dloa/*; do
-            if [[ "$file" =~ \.zip$ ]]; then
-              unzip "$file" -d "${file%.zip}"
-            elif [[ "$file" =~ \.tar.gz$ ]]; then
-              tar -xvzf "$file" -C "${file%.tar.gz}"
-            elif [[ "$file" =~ \.7z$ ]]; then
-              7z x "$file" -o"${file%.7z}"
+          cd dloa || exit 1
+          for file in *; do
+            if [ -f "$file" ]; then
+              crc32 "$file" >> ../checksums.txt  # Store checksums in a file
+            fi
+            
+            # If the file is a zip archive, unzip it and calculate CRC-32 for the extracted files
+            if [[ "$file" == *.zip ]]; then
+              unzip "$file" -d "${file%.zip}" && cd "${file%.zip}" || continue
+              for inner_file in *; do
+                crc32 "$inner_file" >> ../../checksums.txt  # Store checksums of extracted files
+              done
+              cd ..  # Go back to the parent directory after processing the archive
             fi
           done
 
-      - name: Compress files if needed
+      # Optionally compress files before uploading them to the release
+      - name: Compress Files (if selected)
         if: ${{ inputs.compress == 'true' }}
         run: |
-          # Сжимаем все файлы в dloa, если указано в параметрах
-          for file in dloa/*; do
-            if [[ -d "$file" ]]; then
-              # Если это директория, архивируем её
-              tar -czf "$file.tar.gz" -C "$file" .
-              rm -rf "$file" # Удаляем оригинальную папку
-            elif [[ -f "$file" ]]; then
-              gzip -k "$file" # Сжимаем файл и оставляем оригинал
-            fi
-          done
+          tar -czf dloa.tar.gz -C dloa .
 
-      - name: Upload Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dloa/*
-          tag_name: ${{ inputs.tag }}
+      # Upload Release with calculated checksums and optionally compressed files 
+      - name: Upload Release in Parallel
+        run: |
+          FILES_TO_UPLOAD="dloa/*"
+          if [ "${{ inputs.compress }}" == "true" ]; then 
+            FILES_TO_UPLOAD="$FILES_TO_UPLOAD dloa.tar.gz"
+          fi
+
+          # Upload checksums.txt as well if it exists 
+          if [ -f "checksums.txt" ]; then 
+            FILES_TO_UPLOAD="$FILES_TO_UPLOAD checksums.txt"
+          fi
+
+          for file in $FILES_TO_UPLOAD; do 
+            echo "Uploading $file..."
+            gh release upload "${{ inputs.tag }}" "$file" --clobber &  # Upload each file in background 
+          done 
+          
+          wait  # Wait for all background uploads to finish
