@@ -100,12 +100,13 @@ jobs:
           fi
 
       - name: Upload to GitHub Release
-        run: |
-          echo "Uploading files to GitHub Release..."
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dloa/*
             dloa_compressed.*
           tag_name: ${{ inputs.tag }}
-          echo "Files uploaded."
+          
+      - name: Confirm Upload
+        run: |
+          echo "Files uploaded to GitHub Release."
