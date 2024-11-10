@@ -190,15 +190,16 @@ jobs:
                 done
                 ;;
               *.iso)
+                echo "Checking files without extracting..."
                 echo "Contents of ISO image: $file"
                 7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
                   (
-                  echo "Extracting $filename from ISO and calculating CRC32"
+                    echo "Extracting $filename from ISO and calculating CRC32"
 
-                  # Используем 7z для извлечения файла в стандартный вывод и передаем его в Python для вычисления CRC32
-                  crc32_value=$(7z e "$file" -so "$filename" | python3 -c "import zlib, sys; print(f'{zlib.crc32(sys.stdin.read()) & 0xffffffff:08x}')")
+                    # Используем 7z для извлечения файла в стандартный вывод и передаем его в Python для вычисления CRC32
+                    crc32_value=$(7z e "$file" -so "$filename" | python3 -c "import zlib, sys; print(f'{zlib.crc32(sys.stdin.buffer.read()) & 0xffffffff:08x}')")
 
-                  echo "File: $filename, CRC32: $crc32_value"
+                    echo "File: $filename, CRC32: $crc32_value"
                   ) &
                 done
                 wait
