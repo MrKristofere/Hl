@@ -66,8 +66,9 @@ jobs:
           echo "apt_key=${apt_key}" >> $GITHUB_ENV
           echo "pip_key=${pip_key}" >> $GITHUB_ENV
 
-          echo "APT Cache Key: $apt_key"
-          echo "PIP Cache Key: $pip_key"
+          # Log cache keys for debugging purposes
+          echo "APT Cache Key: apt-cache-${{ github.workflow }}-${{ github.run_id }}-${apt_key}"
+          echo "PIP Cache Key: pip-cache-${{ github.workflow }}-${{ github.run_id }}-${pip_key}"
 
       - name: Cache apt-get dependencies
         uses: actions/cache@v4
@@ -76,6 +77,7 @@ jobs:
           path: /tmp/apt-cache
           key: apt-cache-${{ env.apt_key }}
           restore-keys: |
+            apt-cache-${{ github.workflow }}-
             apt-cache-
 
       - name: Cache Python dependencies
@@ -85,6 +87,7 @@ jobs:
           path: ~/.cache/pip
           key: pip-cache-${{ env.pip_key }}
           restore-keys: |
+            pip-cache-${{ github.workflow }}-
             pip-cache-
 
       - name: Install apt dependencies if needed
@@ -123,91 +126,46 @@ jobs:
             echo "File: $file, CRC32: $crc32_value"
           done
 
-      - name: Check files
+      - name: Check files without extracting...
         run: |
           echo "Checking files without extracting..."
-          for file in dloa/*; do
-            case $file in
-              *.tar.*)
-                echo "Contents of TAR archive: $file"
-                tar -tf "$file"
-                ;;
-              *.zip)
-                echo "Contents of ZIP archive: $file"
-                unzip -l "$file"
-                ;;
-              *.rar)
-                echo "Contents of RAR archive: $file"
-                7z l "$file"
-                ;;
-              *.7z)
-                echo "Contents of 7z archive: $file"
-                7z l "$file"
-                ;;
-              *.tar.gz|*.tgz)
-                echo "Contents of TAR.GZ archive: $file"
-                tar -tzf "$file"
-                ;;
-              *.tar.bz2)
-                echo "Contents of TAR.BZ2 archive: $file"
-                tar -tjf "$file"
-                ;;
-              *.tar.xz)
-                echo "Contents of TAR.XZ archive: $file"
-                tar -tJf "$file"
-                ;;
-              *.tar.Z)
-                echo "Contents of TAR.Z archive: $file"
-                tar -tZf "$file"
-                ;;
-              *.arj)
-                echo "Contents of ARJ archive: $file"
-                arj v "$file"
-                ;;
-              *.cab)
-                echo "Contents of CAB archive: $file"
-                cabextract -l "$file"
-                ;;
-              *.xz)
-                echo "Contents of XZ archive: $file"
-                xz -l "$file"
-                ;;
-              *.gz)
-                echo "Contents of GZ archive: $file"
-                gzip -l "$file"
-                ;;
-              *.bz2)
-                echo "Contents of BZ2 archive: $file"
-                bzip2 -l "$file"
-                ;;
-              *.iso)
-                echo "Contents of ISO image: $file"
-                isoinfo -i "$file" -l
-                ;;
-              *.img)
-                echo "Checking partitions in IMG file: $file"
-                parted "$file" print
-                ;;
-            esac
+          for file in dloa/*; do 
+            case $file in 
+              *.tar.*) tar -tf "$file" ;; 
+              *.zip) unzip -l "$file" ;; 
+              *.rar) 7z l "$file" ;; 
+              *.7z) 7z l "$file" ;; 
+              *.tar.gz|*.tgz) tar -tzf "$file" ;; 
+              *.tar.bz2) tar -tjf "$file" ;; 
+              *.tar.xz) tar -tJf "$file" ;; 
+              *.tar.Z) tar -tZf "$file" ;; 
+              *.arj) arj v "$file" ;; 
+              *.cab) cabextract -l "$file" ;; 
+              *.xz) xz -l "$file" ;; 
+              *.gz) gzip -l "$file" ;; 
+              *.bz2) bzip2 -l "$file" ;; 
+              *.iso) isoinfo -i "$file" -l ;; 
+              *.img) parted "$file" print ;; 
+            esac 
           done
 
-      - name: File compression archive
+      - name: File compression archive...
         run: |
           echo "Compressing files..."
-          if [ "${{ inputs.compression }}" != "none" ]; then
-            case "${{ inputs.compression }}" in
-              gzip) tar -cvzf "dloa_compressed.tar.gz" -C dloa . ;;
-              bzip2) tar -cvjf "dloa_compressed.tar.bz2" -C dloa . ;;
-              xz) tar -cvJf "dloa_compressed.tar.xz" -C dloa . ;;
-              rar) 7z a -m0=rar -mx${{ inputs.compress_level }} "dloa_compressed.rar" "dloa/*" ;; 
-              7z) 7z a -mx${{ inputs.compress_level }} "dloa_compressed.7z" "dloa/*" ;;
-              zip) 7z a -tzip -mx${{ inputs.compress_level }} "dloa_compressed.zip" "dloa/*" ;;
-            esac
-          else
-            echo "No compression selected."
+          if [ "${{ inputs.compression }}" != "none" ]; then 
+            case "${{ inputs.compression }}" in 
+              gzip) tar -cvzf "dloa_compressed.tar.gz" -C dloa . ;; 
+              bzip2) tar -cvjf "dloa_compressed.tar.bz2" -C dloa . ;; 
+              xz) tar -cvJf "dloa_compressed.tar.xz" -C dloa . ;; 
+              rar) 7z a -m0=rar -mx${{ inputs.compress_level }} "dloa_compressed.rar" "dloa/*" ;;  
+              7z) 7z a -mx${{ inputs.compress_level }} "dloa_compressed.7z" "dloa/*" ;; 
+              zip) 7z a -tzip -mx${{ inputs.compress_level }} "dloa_compressed.zip" "dloa/*" ;; 
+            esac 
+          else 
+            echo "No compression selected." 
           fi
 
-      - name: Upload to GitHub Release
+      - name: Upload to GitHub Release...
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -215,6 +173,6 @@ jobs:
             dloa_compressed.*
           tag_name: ${{ inputs.tag }}
 
-      - name: Confirm Upload
+      - name: Confirm Upload...
         run: |
           echo "Files uploaded to GitHub Release."
