@@ -67,12 +67,9 @@ jobs:
         run: |
           echo "Verifying CRC32 checksums..."
           
-          # Install the crc32c library
-          pip3 install crc32c
-
-          # Python script to compute CRC32C
+          # Python script to compute CRC32
           for file in dloa/*; do
-            crc32_value=$(python3 -c "import crc32c; print(crc32c.crc32c(open('$file', 'rb').read()))")
+            crc32_value=$(python3 -c "import zlib; print(f'{zlib.crc32(open('$file', 'rb').read()):08x}')")
             echo "File: $file, CRC32: $crc32_value"
           done
 
