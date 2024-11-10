@@ -76,21 +76,15 @@ jobs:
         if: steps.apt-cache.outputs.cache-hit != 'true' || steps.pip-cache.outputs.cache-hit != 'true'
         run: |
           echo "Creating requirements files..."
-
-          # Создаем временные requirements.txt и apt-requirements.txt
-          echo "crc32c" > requirements.txt  # Пример зависимости Python
-          echo "aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage tar arj cabextract python3" > apt-requirements.txt  # Пример зависимостей apt
-
+          echo "crc32c" > requirements.txt
+          echo "aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage tar arj cabextract python3" > apt-requirements.txt
           echo "Installing apt dependencies..."
           sudo apt-get update
-          sudo apt-get install -y $(cat apt-requirements.txt)  # Устанавливаем зависимости из apt-requirements.txt
-
+          sudo apt-get install -y $(cat apt-requirements.txt)
           echo "Installing pip dependencies..."
-          pip3 install -r requirements.txt  # Устанавливаем зависимости Python из requirements.txt
-
+          pip3 install -r requirements.txt
           echo "Dependencies installed."
 
-      # Скачать файлы
       - name: Download files (parallel)
         run: |
           echo "Downloading files..."
@@ -115,81 +109,79 @@ jobs:
             crc32_value=$(python3 -c "import zlib; print(f'{zlib.crc32(open(\"$file\", \"rb\").read()):08x}')")
             echo "File: $file, CRC32: $crc32_value"
           done
-          
+
       - name: Check files
         run: |
           echo "Checking files without extracting..."
-          
           for file in dloa/*; do
             case $file in
               *.tar.*)
                 echo "Contents of TAR archive: $file"
-                tar -tf "$file"  # Просмотр содержимого архива TAR
+                tar -tf "$file"
                 ;;
               *.zip)
                 echo "Contents of ZIP archive: $file"
-                unzip -l "$file"  # Просмотр содержимого ZIP архива
+                unzip -l "$file"
                 ;;
               *.rar)
                 echo "Contents of RAR archive: $file"
-                7z l "$file"  # Просмотр содержимого RAR архива
+                7z l "$file"
                 ;;
               *.7z)
                 echo "Contents of 7z archive: $file"
-                7z l "$file"  # Просмотр содержимого 7z архива
+                7z l "$file"
                 ;;
               *.tar.gz|*.tgz)
                 echo "Contents of TAR.GZ archive: $file"
-                tar -tzf "$file"  # Просмотр содержимого TAR.GZ
+                tar -tzf "$file"
                 ;;
               *.tar.bz2)
                 echo "Contents of TAR.BZ2 archive: $file"
-                tar -tjf "$file"  # Просмотр содержимого TAR.BZ2
+                tar -tjf "$file"
                 ;;
               *.tar.xz)
                 echo "Contents of TAR.XZ archive: $file"
-                tar -tJf "$file"  # Просмотр содержимого TAR.XZ
+                tar -tJf "$file"
                 ;;
               *.tar.Z)
                 echo "Contents of TAR.Z archive: $file"
-                tar -tZf "$file"  # Просмотр содержимого TAR.Z
+                tar -tZf "$file"
                 ;;
               *.arj)
                 echo "Contents of ARJ archive: $file"
-                arj v "$file"  # Просмотр содержимого ARJ архива
+                arj v "$file"
                 ;;
               *.cab)
                 echo "Contents of CAB archive: $file"
-                cabextract -l "$file"  # Просмотр содержимого CAB архива
+                cabextract -l "$file"
                 ;;
               *.xz)
                 echo "Contents of XZ archive: $file"
-                xz -l "$file"  # Просмотр содержимого XZ архива
+                xz -l "$file"
                 ;;
               *.gz)
                 echo "Contents of GZ archive: $file"
-                gzip -l "$file"  # Просмотр содержимого GZ архива
+                gzip -l "$file"
                 ;;
               *.bz2)
                 echo "Contents of BZ2 archive: $file"
-                bzip2 -l "$file"  # Просмотр содержимого BZ2 архива
+                bzip2 -l "$file"
                 ;;
               *.iso)
                 echo "Contents of ISO image: $file"
-                isoinfo -i "$file" -l  # Просмотр содержимого ISO-образа
+                isoinfo -i "$file" -l
                 ;;
               *.img)
                 echo "Checking partitions in IMG file: $file"
-                parted "$file" print  # Просмотр разделов в IMG файле
+                parted "$file" print
                 ;;
             esac
-            
-            # Проверка CRC32 для всех файлов
             if [ -f "$file" ]; then
               crc32_value=$(python3 -c "import zlib; print(f'{zlib.crc32(open(\"$file\", \"rb\").read()):08x}')")
               echo "File: $file, CRC32: $crc32_value"
             fi
           done
+
       - name: File compression archive
         run: |          
           echo "Compressing files..."
