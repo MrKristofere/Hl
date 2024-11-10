@@ -84,6 +84,14 @@ jobs:
           restore-keys: |
             pip-cache-
 
+      - name: Check for Cache Updates
+        run: |
+          if [[ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" || "${{ steps.pip-cache.outputs.cache-hit }}" != "true" ]]; then
+            echo "Dependencies have changed or cache is missing. Rebuilding cache..."
+          else
+            echo "No dependency changes detected. Using cached dependencies."
+          fi
+
       - name: Install apt dependencies if needed
         if: steps.apt-cache.outputs.cache-hit != 'true'
         run: |
