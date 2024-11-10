@@ -1,0 +1,154 @@
+name: Upload File (t)
+
+on:
+  workflow_dispatch:
+    inputs:
+      upl:
+        description: 'Comma-separated URLs'
+        required: true
+        type: string
+      tag:
+        description: 'Tag'
+        required: true
+        type: string
+      compression:
+        description: 'Compression method'
+        required: false
+        type: choice
+        options:
+          - none
+          - gzip
+          - bzip2
+          - xz
+          - rar
+          - 7z
+          - zip
+      compress_level:
+        description: 'Compression level (1-9)'
+        required: false
+        type: number
+        default: 6
+      checksum:
+        description: 'Enable CRC32 checksum verification'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  id-token: write
+  actions: read
+
+jobs:
+  download_compress_and_upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Убедитесь, что директории для кеша существуют
+      - name: Ensure cache directories exist
+        run: |
+          mkdir -p /tmp/apt-cache
+          mkdir -p ~/.cache/pip
+
+      # Кеширование apt-get зависимостей
+      - name: Cache apt-get dependencies
+        id: apt-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/apt-cache
+          key: ${{ runner.os }}-apt-${{ hashFiles('apt-requirements.txt') }}  # Кешируем по хешу apt-requirements.txt
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
+      # Кеширование Python зависимостей
+      - name: Cache Python dependencies
+        id: pip-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}  # Кешируем по хешу requirements.txt
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # Установка зависимостей (если кеш не найден)
+      - name: Install dependencies
+        if: steps.apt-cache.outputs.cache-hit != 'true' || steps.pip-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "Creating requirements files..."
+
+          # Создаем временные requirements.txt и apt-requirements.txt
+          echo "crc32c" > requirements.txt  # Пример зависимости Python
+          echo "aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils genisoimage" > apt-requirements.txt  # Пример зависимостей apt
+
+          echo "Installing apt dependencies..."
+          sudo apt-get update
+          sudo apt-get install -y $(cat apt-requirements.txt)  # Устанавливаем зависимости из apt-requirements.txt
+
+          echo "Installing pip dependencies..."
+          pip3 install -r requirements.txt  # Устанавливаем зависимости Python из requirements.txt
+
+          echo "Dependencies installed."
+
+      # Скачать файлы
+      - name: Download files (parallel)
+        run: |
+          echo "Downloading files..."
+          IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
+          for url in "${urls[@]}"; do
+            aria2c -d dloa -x 16 -s 16 --continue=true --max-connection-per-server=4 --split=16 --min-split-size=1M "$url" &
+          done
+          wait
+          echo "Files downloaded."
+
+      - name: Verify downloaded files
+        run: |
+          echo "Verifying downloaded files..."
+          ls -lh dloa
+          echo "Downloaded files listed above."
+
+      - name: Verify CRC32 checksum
+        if: ${{ inputs.checksum == true }}
+        run: |
+          echo "Verifying CRC32 checksums..."
+          for file in dloa/*; do
+            crc32_value=$(python3 -c "import zlib; print(f'{zlib.crc32(open(\"$file\", \"rb\").read()):08x}')")
+            echo "File: $file, CRC32: $crc32_value"
+          done
+
+      # Извлечение и сжатие файлов
+      - name: Extract and compress files
+        run: |
+          echo "Extracting files..."
+          for file in dloa/*; do
+            case $file in
+              *.tar.*) mkdir -p "dloa/$(basename "$file" .${file##*.})" && tar -xvf "$file" -C "dloa/$(basename "$file" .${file##*.})" ;;
+              *.zip|*.rar|*.7z) mkdir -p "dloa/$(basename "$file" .${file##*.})" && 7z x "$file" -o"dloa/$(basename "$file" .${file##*.})" ;;
+              *.iso) mkdir -p "dloa/iso_contents" && isoinfo -i "$file" -l > "dloa/iso_contents/contents.txt" && cat "dloa/iso_contents/contents.txt" ;;
+            esac
+          done
+          
+          echo "Compressing files..."
+          if [ "${{ inputs.compression }}" != "none" ]; then
+            case "${{ inputs.compression }}" in
+              gzip) tar -cvzf "dloa_compressed.tar.gz" -C dloa . ;;
+              bzip2) tar -cvjf "dloa_compressed.tar.bz2" -C dloa . ;;
+              xz) tar -cvJf "dloa_compressed.tar.xz" -C dloa . ;;
+              rar) 7z a -m0=rar -mx${{ inputs.compress_level }} "dloa_compressed.rar" "dloa/*" ;; 
+              7z) 7z a -mx${{ inputs.compress_level }} "dloa_compressed.7z" "dloa/*" ;;
+              zip) 7z a -tzip -mx${{ inputs.compress_level }} "dloa_compressed.zip" "dloa/*" ;;
+            esac
+          else
+            echo "No compression selected."
+          fi
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dloa/*
+            dloa_compressed.*
+          tag_name: ${{ inputs.tag }}
+
+      - name: Confirm Upload
+        run: |
+          echo "Files uploaded to GitHub Release."
