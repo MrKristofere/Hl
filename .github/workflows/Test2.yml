@@ -44,7 +44,7 @@ jobs:
     steps:
       - name: Install dependencies... or perhaps just embrace the void? 🌚
         run: |
-          sudo apt-get update && sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils python3-pip
+          sudo apt-get update && sudo apt-get install -y aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils python3-pip genisoimage
           pip3 install crc32c
           echo "The dependencies are installed... or are they? 🌀🕳️"
 
