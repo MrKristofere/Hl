@@ -58,7 +58,7 @@ jobs:
       - name: Generate Cache Keys Based on Dependency Files
         id: cache-keys
         run: |
-          # Generate SHA256 hashes for dependency files
+          # Generate SHA256 hashes for dependency files to ensure cache updates on changes
           apt_key=$(sha256sum apt-requirements.txt | awk '{print $1}')
           pip_key=$(sha256sum requirements.txt | awk '{print $1}')
           
@@ -67,17 +67,16 @@ jobs:
           echo "pip_key=${pip_key}" >> $GITHUB_ENV
 
           # Log cache keys for debugging purposes
-          echo "APT Cache Key: apt-cache-${{ github.workflow }}-${{ github.run_id }}-${apt_key}"
-          echo "PIP Cache Key: pip-cache-${{ github.workflow }}-${{ github.run_id }}-${pip_key}"
+          echo "APT Cache Key: apt-cache-${apt_key}"
+          echo "PIP Cache Key: pip-cache-${pip_key}"
 
       - name: Cache apt-get dependencies
         uses: actions/cache@v4
         id: apt-cache
         with:
           path: /tmp/apt-cache
-          key: apt-cache-${{ env.apt_key }}
+          key: apt-cache-${{ env.apt_key }}  # Ключ кэша зависит от хеша файла зависимостей APT.
           restore-keys: |
-            apt-cache-${{ github.workflow }}-
             apt-cache-
 
       - name: Cache Python dependencies
@@ -85,9 +84,8 @@ jobs:
         id: pip-cache
         with:
           path: ~/.cache/pip
-          key: pip-cache-${{ env.pip_key }}
+          key: pip-cache-${{ env.pip_key }}  # Ключ кэша зависит от хеша файла зависимостей PIP.
           restore-keys: |
-            pip-cache-${{ github.workflow }}-
             pip-cache-
 
       - name: Install apt dependencies if needed
@@ -105,7 +103,7 @@ jobs:
           pip3 install -r requirements.txt
           echo "PIP dependencies installed."
 
-      - name: Download files
+      - name: Download files...
         run: |
           mkdir -p dloa
           IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
@@ -114,11 +112,11 @@ jobs:
           done
           wait
 
-      - name: Verify downloaded files
+      - name: Verify downloaded files...
         run: |
           ls -lh dloa
 
-      - name: Verify CRC32 checksum
+      - name: Verify CRC32 checksum...
         if: ${{ inputs.checksum == true }}
         run: |
           for file in dloa/*; do
