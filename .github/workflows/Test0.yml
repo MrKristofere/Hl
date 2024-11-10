@@ -45,6 +45,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Create Cache Directories
+        run: |
+          mkdir -p /tmp/apt-cache
+          mkdir -p ~/.cache/pip
+
       - name: Create Dependency Files
         run: |
           echo "crc32c" > requirements.txt
