@@ -55,7 +55,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/apt-cache
-          key: ${{ runner.os }}-apt-${{ hashFiles('apt-requirements.txt') }}  # Убедитесь, что зависимость от apt-requirements.txt
+          key: ${{ runner.os }}-apt-${{ hashFiles('apt-requirements.txt') }}  # Ключ зависит от apt-requirements.txt
           restore-keys: |
             ${{ runner.os }}-apt-
 
@@ -64,7 +64,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}  # Убедитесь, что зависимость от requirements.txt
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}  # Ключ зависит от requirements.txt
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -79,12 +79,22 @@ jobs:
           echo "Creating requirements files..."
           echo "crc32c" > requirements.txt
           echo "aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage tar arj cabextract python3" > apt-requirements.txt
-          echo "Installing apt dependencies..."
-          sudo apt-get update
-          sudo apt-get install -y $(cat apt-requirements.txt)
-          echo "Installing pip dependencies..."
-          pip3 install -r requirements.txt
-          echo "Dependencies installed."
+          
+          # Если кэш не найден, устанавливаем зависимости
+          if [ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" ]; then
+            echo "Installing apt dependencies..."
+            sudo apt-get update
+            sudo apt-get install -y $(cat apt-requirements.txt)
+          else
+            echo "APT dependencies cache hit, skipping installation."
+          fi
+
+          if [ "${{ steps.pip-cache.outputs.cache-hit }}" != "true" ]; then
+            echo "Installing pip dependencies..."
+            pip3 install -r requirements.txt
+          else
+            echo "Pip dependencies cache hit, skipping installation."
+          fi
 
       - name: Download files (parallel)
         run: |
