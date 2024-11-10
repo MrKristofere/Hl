@@ -50,28 +50,44 @@ jobs:
           mkdir -p /tmp/apt-cache
           mkdir -p ~/.cache/pip
 
-      - name: Create Dependency Files
+      - name: Add dependencies to requirement files
         run: |
+          # Добавляем зависимости в файлы
           echo "crc32c" > requirements.txt
           echo "aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage tar arj cabextract python3" > apt-requirements.txt
 
-      # Получаем хэш-суммы содержимого файлов зависимостей
-      - name: Calculate Cache Keys
+      - name: Generate Cache Keys
         id: cache-keys
         run: |
-          echo "Generating cache keys for apt and pip dependencies..."
+          # Считываем хэш-сумму файлов зависимостей
+          apt_hash_new=$(sha256sum apt-requirements.txt | awk '{print $1}')
+          pip_hash_new=$(sha256sum requirements.txt | awk '{print $1}')
           
-          # Хэш-сумма для apt и pip зависимостей
-          apt_key=$(sha256sum apt-requirements.txt | awk '{print $1}')
-          pip_key=$(sha256sum requirements.txt | awk '{print $1}')
-          
-          echo "apt_key=${apt_key}" >> $GITHUB_ENV
-          echo "pip_key=${pip_key}" >> $GITHUB_ENV
-          
-          echo "APT Cache Key: $apt_key"
-          echo "PIP Cache Key: $pip_key"
+          # Считываем предыдущие хэши из переменных окружения
+          apt_hash_old="${{ env.apt_hash_old }}"
+          pip_hash_old="${{ env.pip_hash_old }}"
 
-      # Кэширование apt зависимостей
+          # Если хэш отличается, сбрасываем ключи для кэширования
+          if [ "$apt_hash_new" != "$apt_hash_old" ]; then
+            echo "APT dependencies changed. Resetting cache key."
+            echo "apt_key=${apt_hash_new}" >> $GITHUB_ENV
+          else
+            echo "APT dependencies not changed. Using existing cache."
+            echo "apt_key=${apt_hash_old}" >> $GITHUB_ENV
+          fi
+
+          if [ "$pip_hash_new" != "$pip_hash_old" ]; then
+            echo "PIP dependencies changed. Resetting cache key."
+            echo "pip_key=${pip_hash_new}" >> $GITHUB_ENV
+          else
+            echo "PIP dependencies not changed. Using existing cache."
+            echo "pip_key=${pip_hash_old}" >> $GITHUB_ENV
+          fi
+
+          # Выводим хэши для проверки
+          echo "New apt hash: $apt_hash_new"
+          echo "New pip hash: $pip_hash_new"
+
       - name: Cache apt-get dependencies
         uses: actions/cache@v4
         id: apt-cache
@@ -81,7 +97,6 @@ jobs:
           restore-keys: |
             apt-cache-
 
-      # Кэширование pip зависимостей
       - name: Cache Python dependencies
         uses: actions/cache@v4
         id: pip-cache
@@ -91,7 +106,6 @@ jobs:
           restore-keys: |
             pip-cache-
 
-      # Установка зависимостей apt, если кэш не найден
       - name: Install apt dependencies if needed
         if: steps.apt-cache.outputs.cache-hit != 'true'
         run: |
@@ -100,7 +114,6 @@ jobs:
           sudo apt-get install -y $(cat apt-requirements.txt)
           echo "APT dependencies installed."
 
-      # Установка зависимостей pip, если кэш не найден
       - name: Install pip dependencies if needed
         if: steps.pip-cache.outputs.cache-hit != 'true'
         run: |
@@ -108,7 +121,6 @@ jobs:
           pip3 install -r requirements.txt
           echo "PIP dependencies installed."
 
-      # Скачивание файлов
       - name: Download files
         run: |
           mkdir -p dloa
@@ -118,12 +130,10 @@ jobs:
           done
           wait
 
-      # Проверка скачанных файлов
       - name: Verify downloaded files
         run: |
           ls -lh dloa
 
-      # Проверка CRC32 (если включено)
       - name: Verify CRC32 checksum
         if: ${{ inputs.checksum == true }}
         run: |
@@ -132,7 +142,6 @@ jobs:
             echo "File: $file, CRC32: $crc32_value"
           done
 
-      # Проверка содержимого архивов
       - name: Check files
         run: |
           echo "Checking files without extracting..."
@@ -205,7 +214,6 @@ jobs:
             fi
           done
 
-      # Архивация файлов
       - name: File compression archive
         run: |          
           echo "Compressing files..."
@@ -222,7 +230,6 @@ jobs:
             echo "No compression selected."
           fi
 
-      # Загрузка на GitHub Release
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
