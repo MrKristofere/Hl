@@ -57,6 +57,12 @@ jobs:
           wait
           echo "Files downloaded."
 
+      - name: Verify downloaded files
+        run: |
+          echo "Verifying downloaded files..."
+          ls -lh dloa
+          echo "Downloaded files listed above."
+
       - name: Verify CRC32 checksum
         if: ${{ inputs.checksum == true }}
         run: |
