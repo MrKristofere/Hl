@@ -67,12 +67,11 @@ jobs:
 
       # Установка зависимостей (если кеш не найден)
       - name: Install dependencies
-        run: |
         if: steps.pip-cache.outputs.cache-hit != 'true'
+        run: |
           echo "Installing pip dependencies..."
           pip3 install crc32c
           echo "Dependencies installed."
-
       - name: Download files
         run: |
           mkdir -p dloa
