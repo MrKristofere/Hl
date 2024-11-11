@@ -111,10 +111,14 @@ jobs:
             elif [[ "$url" == *"gofile.io"* ]]; then
               # Для файлов с gofile.io получаем окончательную ссылку через их API
               file_id=$(echo "$url" | grep -oP '(?<=/download/)[^/]+')
+              echo "Получаем ссылку для файла с gofile.io с ID: $file_id"
               gofile_api="https://api.gofile.io/getUpload?c=$file_id"
     
               # Запрос к API и проверка на успех
               gofile_response=$(curl -s "$gofile_api")
+    
+              # Выводим ответ для диагностики
+              echo "Ответ от API gofile.io: $gofile_response"
     
               # Проверка, что ответ является валидным JSON
               if ! echo "$gofile_response" | jq . >/dev/null 2>&1; then
@@ -126,6 +130,7 @@ jobs:
     
               if [[ "$status" == "ok" ]]; then
                 real_url=$(echo "$gofile_response" | jq -r '.data.directLink')
+                echo "Прямая ссылка для скачивания: $real_url"
                 download_urls+=("$real_url")
               else
                 echo "Ошибка: Невозможно получить ссылку для загрузки с gofile.io для $url"
