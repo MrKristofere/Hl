@@ -94,21 +94,36 @@ jobs:
               api_url="https://api.github.com/repos/$owner_repo/releases/tags/$tag"
 
               # Получение ссылки на артефакты
-              assets=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$api_url" | jq -r '.assets[] | .browser_download_url')
+              assets=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$api_url")
+    
+              # Проверка, что ответ является валидным JSON
+              if ! echo "$assets" | jq . >/dev/null 2>&1; then
+                echo "Ошибка при получении данных с API GitHub для $url"
+                continue
+              fi
+
+              assets=$(echo "$assets" | jq -r '.assets[] | .browser_download_url')
 
               for asset_url in $assets; do
                 real_asset_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$asset_url")
-                download_urls+=("$real_asset_url")
-              done
-            elif [[ "$url" == *"gofile.io"* ]]; then
+               download_urls+=("$real_asset_url")
+             done
+           elif [[ "$url" == *"gofile.io"* ]]; then
               # Для файлов с gofile.io получаем окончательную ссылку через их API
               file_id=$(echo "$url" | grep -oP '(?<=/download/)[^/]+')
               gofile_api="https://api.gofile.io/getUpload?c=$file_id"
-        
+    
               # Запрос к API и проверка на успех
               gofile_response=$(curl -s "$gofile_api")
+    
+              # Проверка, что ответ является валидным JSON
+              if ! echo "$gofile_response" | jq . >/dev/null 2>&1; then
+                echo "Ошибка при получении данных с API gofile.io для $url"
+                continue
+              fi
+    
               status=$(echo "$gofile_response" | jq -r '.status')
-        
+    
               if [[ "$status" == "ok" ]]; then
                 real_url=$(echo "$gofile_response" | jq -r '.data.directLink')
                 download_urls+=("$real_url")
@@ -127,7 +142,7 @@ jobs:
           printf "%s\n" "${download_urls[@]}" > urls.txt
 
           # Загрузка файлов с помощью aria2c
-          aria2c -i urls.txt -d dloa -x 16 -s 16 --continue=true --auto-file-renaming=false          
+          aria2c -i urls.txt -d dloa -x 16 -s 16 --continue=true --auto-file-renaming=false
 
       - name: Verify downloaded files
         run: |
