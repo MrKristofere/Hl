@@ -27,12 +27,17 @@ on:
         description: 'Compression level (1-9)'
         required: false
         type: number
-        default: 6
+        default:
       checksum:
         description: 'Enable CRC32 checksum verification'
         required: false
         type: boolean
         default: true
+      extract:
+        description: 'Extract files after download'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -112,6 +117,7 @@ jobs:
           done
 
       - name: CRC32 Calculation for Files in Archives and Images
+        if: ${{ inputs.extract == true }}
         run: |
           echo "Checking files without extracting..."
           for file in dloa/*; do
