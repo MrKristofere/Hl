@@ -34,7 +34,7 @@ on:
         type: boolean
         default: true
       extract:
-        description: 'Extract files after download'
+        description: 'Extract files for verification crc-32 after download'
         required: false
         type: boolean
         default: false
