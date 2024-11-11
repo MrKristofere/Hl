@@ -160,7 +160,8 @@ jobs:
                     fi
                     file_size=$(stat -c %s "$filepath")
                     readable_size=$(numfmt --to=iec --suffix=B "$file_size")
-                    crc32_value=$(crc32 "$filepath")
+                    # Используем Python для вычисления CRC32
+                    crc32_value=$(python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}') < \"$filepath\"")
                     echo "File: $filepath, Size: $readable_size ($file_size bytes), CRC32: $crc32_value"
                 done
                 sudo umount "$mount_point"
