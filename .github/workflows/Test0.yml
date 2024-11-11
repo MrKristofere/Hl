@@ -154,16 +154,21 @@ jobs:
                 echo "Mounting ISO: $file"
                 mount_point=$(mktemp -d)
                 sudo mount -o loop "$file" "$mount_point"
+                
                 find "$mount_point" -type f | while read filepath; do
-                    if [[ "$filepath" =~ /[.]/ ]]; then
-                        continue
-                    fi
-                    file_size=$(stat -c %s "$filepath")
-                    readable_size=$(numfmt --to=iec --suffix=B "$file_size")
-                    # Используем Python для вычисления CRC32
-                    crc32_value=$(python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}') < \"$filepath\"")
-                    echo "File: $filepath, Size: $readable_size ($file_size bytes), CRC32: $crc32_value"
+                  if [[ "$filepath" =~ /[.]/ ]]; then
+                    continue
+                  fi
+                  
+                  file_size=$(stat -c %s "$filepath")
+                  readable_size=$(numfmt --to=iec --suffix=B "$file_size")
+                  
+                  # Используем Python для вычисления CRC32
+                  crc32_value=$(python3 -c "import zlib; import sys; f = open('$filepath', 'rb'); print(f'{zlib.crc32(f.read()) & 0xffffffff:08x}')")
+                  
+                  echo "File: $filepath, Size: $readable_size ($file_size bytes), CRC32: $crc32_value"
                 done
+                
                 sudo umount "$mount_point"
                 rmdir "$mount_point"
                 ;;
