@@ -92,7 +92,7 @@ jobs:
               owner_repo="${url%@*}"
               tag="${url##*@}"
               api_url="https://api.github.com/repos/$owner_repo/releases/tags/$tag"
-              
+        
               # Получение ссылки на артефакты
               assets=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$api_url" | jq -r '.assets[] | .browser_download_url')
 
@@ -105,9 +105,12 @@ jobs:
             fi
           done
 
-          # Загружаем все файлы параллельно
+          # Создаём файл со списком ссылок для aria2c
           echo "Downloading files in parallel..."
-          aria2c -d dloa -x 16 -s 16 --continue=true "${download_urls[@]}"
+          printf "%s\n" "${download_urls[@]}" > urls.txt
+
+          # Загрузка файлов с помощью aria2c
+          aria2c -i urls.txt -d dloa -x 16 -s 16 --continue=true
 
       - name: Verify downloaded files
         run: |
