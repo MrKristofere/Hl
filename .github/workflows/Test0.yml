@@ -104,8 +104,17 @@ jobs:
               # Для файлов с gofile.io получаем окончательную ссылку через их API
               file_id=$(echo "$url" | grep -oP '(?<=/download/)[^/]+')
               gofile_api="https://api.gofile.io/getUpload?c=$file_id"
-              real_url=$(curl -s "$gofile_api" | jq -r '.data.directLink')
-              download_urls+=("$real_url")
+        
+              # Запрос к API и проверка на успех
+              gofile_response=$(curl -s "$gofile_api")
+              status=$(echo "$gofile_response" | jq -r '.status')
+        
+              if [[ "$status" == "ok" ]]; then
+                real_url=$(echo "$gofile_response" | jq -r '.data.directLink')
+                download_urls+=("$real_url")
+              else
+                echo "Ошибка: Невозможно получить ссылку для загрузки с gofile.io для $url"
+              fi
             else
               # Для остальных URL получаем фактический URL через curl
               real_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$url")
@@ -118,7 +127,7 @@ jobs:
           printf "%s\n" "${download_urls[@]}" > urls.txt
 
           # Загрузка файлов с помощью aria2c
-          aria2c -i urls.txt -d dloa -x 16 -s 16 --continue=true --auto-file-renaming=false
+          aria2c -i urls.txt -d dloa -x 16 -s 16 --continue=true --auto-file-renaming=false          
 
       - name: Verify downloaded files
         run: |
