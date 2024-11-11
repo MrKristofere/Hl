@@ -101,9 +101,16 @@ jobs:
                 download_urls+=("$real_asset_url")
               done
             else
-              # Получение фактического URL через curl
+              # Для URL без прямых ссылок, используем wget или curl для обхода редиректов
               real_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$url")
-              download_urls+=("$real_url")
+
+              # Если это сайт, который генерирует ссылки через JavaScript, можно использовать wget или curl с флагами для обхода защиты
+              if [[ "$real_url" =~ ^https://example.com/.* ]]; then
+                # Пример для скачивания с сайта, где ссылка генерируется через JavaScript
+                wget --header="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" --max-redirect=10 --trust-server-names "$real_url" -P dloa
+              else
+                download_urls+=("$real_url")
+              fi
             fi
           done
 
