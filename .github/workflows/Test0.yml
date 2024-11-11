@@ -135,7 +135,6 @@ jobs:
               else
                 echo "Ошибка: Невозможно получить ссылку для загрузки с gofile.io для $url"
               fi
-            fi
             else
               # Для остальных URL получаем фактический URL через curl
               real_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$url")
