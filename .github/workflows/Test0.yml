@@ -92,21 +92,22 @@ jobs:
               owner_repo="${url%@*}"
               tag="${url##*@}"
               api_url="https://api.github.com/repos/$owner_repo/releases/tags/$tag"
-        
+
               # Получение ссылки на артефакты
               assets=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$api_url" | jq -r '.assets[] | .browser_download_url')
 
               for asset_url in $assets; do
-                download_urls+=("$asset_url")
+                real_asset_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$asset_url")
+                download_urls+=("$real_asset_url")
               done
             else
+              # Получение фактического URL через curl
               real_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$url")
-              # Скачивание через aria2c
-              download_urls+=("$url")
+              download_urls+=("$real_url")
             fi
           done
 
-          # Создаём файл со списком ссылок для aria2c
+          # Создаём файл со списком прямых ссылок для aria2c
           echo "Downloading files in parallel..."
           printf "%s\n" "${download_urls[@]}" > urls.txt
 
