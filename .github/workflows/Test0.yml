@@ -53,7 +53,7 @@ jobs:
         id: apt-cache
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: aria2 curl jq unzip p7zip-full rsync zip gzip bzip2 xz-utils parted genisoimage cdrtools tar arj cabextract python3-pip
+          packages: aria2 curl jq unzip p7zip-full crc32 util-linux numfmt rsync zip gzip bzip2 xz-utils parted genisoimage cdrtools tar arj cabextract python3-pip
 
       # Кеширование Python зависимостей
       - name: Cache Python dependencies
@@ -151,17 +151,20 @@ jobs:
                 done
                 ;;
               *.iso)
-                echo "Checking ISO contents: $file"
-                7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
-                  # Skip empty or invalid filenames
-                  if [ -z "$filename" ]; then
-                    continue
-                  fi
-                  crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
-                  if [ "$crc32_value" != "00000000" ]; then
-                    echo "File: $filename, CRC32: $crc32_value"
-                  fi
+                echo "Mounting ISO: $file"
+                mount_point=$(mktemp -d)
+                sudo mount -o loop "$file" "$mount_point"
+                find "$mount_point" -type f | while read filepath; do
+                    if [[ "$filepath" =~ /[.]/ ]]; then
+                        continue
+                    fi
+                    file_size=$(stat -c %s "$filepath")
+                    readable_size=$(numfmt --to=iec --suffix=B "$file_size")
+                    crc32_value=$(crc32 "$filepath")
+                    echo "File: $filepath, Size: $readable_size ($file_size bytes), CRC32: $crc32_value"
                 done
+                sudo umount "$mount_point"
+                rmdir "$mount_point"
                 ;;
               *.img)
                 echo "Checking IMG contents: $file"
