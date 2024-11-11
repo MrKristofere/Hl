@@ -100,8 +100,14 @@ jobs:
                 real_asset_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$asset_url")
                 download_urls+=("$real_asset_url")
               done
+            elif [[ "$url" == *"gofile.io"* ]]; then
+              # Для файлов с gofile.io получаем окончательную ссылку через их API
+              file_id=$(echo "$url" | grep -oP '(?<=/download/)[^/]+')
+              gofile_api="https://api.gofile.io/getUpload?c=$file_id"
+              real_url=$(curl -s "$gofile_api" | jq -r '.data.directLink')
+              download_urls+=("$real_url")
             else
-              # Получение фактического URL через curl
+              # Для остальных URL получаем фактический URL через curl
               real_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$url")
               download_urls+=("$real_url")
             fi
