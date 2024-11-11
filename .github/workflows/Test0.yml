@@ -106,9 +106,9 @@ jobs:
 
               for asset_url in $assets; do
                 real_asset_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$asset_url")
-               download_urls+=("$real_asset_url")
-             done
-           elif [[ "$url" == *"gofile.io"* ]]; then
+                download_urls+=("$real_asset_url")
+              done
+            elif [[ "$url" == *"gofile.io"* ]]; then
               # Для файлов с gofile.io получаем окончательную ссылку через их API
               file_id=$(echo "$url" | grep -oP '(?<=/download/)[^/]+')
               gofile_api="https://api.gofile.io/getUpload?c=$file_id"
@@ -136,6 +136,12 @@ jobs:
               download_urls+=("$real_url")
             fi
           done
+
+          # Проверяем, были ли добавлены ссылки для загрузки
+          if [ ${#download_urls[@]} -eq 0 ]; then
+            echo "Ошибка: Не удалось собрать ссылки для загрузки."
+            exit 1
+          fi
 
           # Создаём файл со списком прямых ссылок для aria2c
           echo "Downloading files in parallel..."
