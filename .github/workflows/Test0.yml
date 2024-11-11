@@ -27,7 +27,7 @@ on:
         description: 'Compression level (1-9)'
         required: false
         type: number
-        default:
+        default: 1
       checksum:
         description: 'Enable CRC32 checksum verification'
         required: false
@@ -73,7 +73,7 @@ jobs:
         if: steps.pip-cache.outputs.cache-hit != 'true'
         run: |
           echo "Installing pip dependencies..."
-          pip3 install crc32c
+          pip3 install crc32c playwright
           echo "Dependencies installed."
 
       - name: Download files from URLs and GitHub Releases
@@ -101,14 +101,42 @@ jobs:
                 download_urls+=("$real_asset_url")
               done
             else
-              # Для URL без прямых ссылок, используем wget или curl для обхода редиректов
+              # Попытка обычного скачивания с использованием curl
               real_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$url")
+              file_extension="${real_url##*.}"
 
-              # Если это сайт, который генерирует ссылки через JavaScript, можно использовать wget или curl с флагами для обхода защиты
-              if [[ "$real_url" =~ ^https://example.com/.* ]]; then
-                # Пример для скачивания с сайта, где ссылка генерируется через JavaScript
-                wget --header="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" --max-redirect=10 --trust-server-names "$real_url" -P dloa
+              # Проверяем, не HTML ли это
+              if curl -s -I "$real_url" | grep -q "text/html"; then
+                # Если это HTML, значит мы не получили файл, а страницу. Используем Playwright.
+                echo "HTML page detected, attempting to download with Playwright..."
+
+                # Используем Playwright для скачивания
+                node <<EOF
+const { chromium } = require('playwright');
+
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.goto('$real_url');
+  
+  // Здесь вы можете добавить дополнительные шаги для взаимодействия с кнопками, если это необходимо
+  // Пример, если нужно кликнуть по кнопке для загрузки:
+  // await page.click('button.download'); // Замените на ваш селектор
+
+  const downloadUrl = await page.url();
+  console.log(`Download URL: ${downloadUrl}`);
+  
+  // Скачиваем файл по сгенерированной ссылке
+  await page.goto(downloadUrl);
+  const filePath = await page.download({ path: 'dloa/file_downloaded' });
+
+  console.log('File downloaded to', filePath);
+
+  await browser.close();
+})();
+EOF
               else
+                # Если это прямой URL файла, добавляем его в список для aria2c
                 download_urls+=("$real_url")
               fi
             fi
