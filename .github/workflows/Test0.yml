@@ -100,6 +100,7 @@ jobs:
                 download_urls+=("$asset_url")
               done
             else
+              real_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$url")
               # Скачивание через aria2c
               download_urls+=("$url")
             fi
@@ -110,7 +111,7 @@ jobs:
           printf "%s\n" "${download_urls[@]}" > urls.txt
 
           # Загрузка файлов с помощью aria2c
-          aria2c -i urls.txt -d dloa -x 16 -s 16 --continue=true
+          aria2c -i urls.txt -d dloa -x 16 -s 16 --continue=true --auto-file-renaming=false
 
       - name: Verify downloaded files
         run: |
