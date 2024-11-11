@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       upl:
-        description: 'Comma-separated URLs'
+        description: 'Comma-separated URLs (or GitHub Release assets in the format "owner/repo@tag")'
         required: true
         type: string
       tag:
@@ -55,31 +55,49 @@ jobs:
         with:
           packages: aria2 curl jq unzip p7zip-full crc32 util-linux numfmt rsync zip gzip bzip2 xz-utils parted genisoimage cdrtools tar arj cabextract python3-pip
 
-      # Кеширование Python зависимостей
       - name: Cache Python dependencies
         id: pip-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/*') }}  # Аналогично для pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/*') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Установка зависимостей (если кеш не найден)
       - name: Install dependencies
         if: steps.pip-cache.outputs.cache-hit != 'true'
         run: |
           echo "Installing pip dependencies..."
           pip3 install crc32c
           echo "Dependencies installed."
-      - name: Download files
+
+      - name: Download files from URLs and GitHub Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p dloa
           IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
+          
           for url in "${urls[@]}"; do
-            aria2c -d dloa -x 16 -s 16 --continue=true "$url" &
+            if [[ "$url" =~ ^[^/]+/[^@]+@.+ ]]; then
+              # Скачивание из релиза GitHub, например "owner/repo@tag"
+              owner_repo="${url%@*}"
+              tag="${url##*@}"
+              api_url="https://api.github.com/repos/$owner_repo/releases/tags/$tag"
+              
+              # Получение ссылки на артефакты
+              assets=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$api_url" | jq -r '.assets[] | .browser_download_url')
+              
+              for asset_url in $assets; do
+                echo "Downloading $asset_url from GitHub Release..."
+                curl -L -o "dloa/$(basename "$asset_url")" "$asset_url"
+              done
+            else
+              # Загрузка URL через aria2c
+              echo "Downloading $url..."
+              aria2c -d dloa -x 16 -s 16 --continue=true "$url"
+            fi
           done
-          wait
 
       - name: Verify downloaded files
         run: |
@@ -101,7 +119,6 @@ jobs:
               *.tar.*)
                 echo "Contents of TAR archive: $file"
                 tar -tf "$file" | while read filename; do
-                  # Skip empty or invalid filenames
                   if [ -z "$filename" ]; then
                     continue
                   fi
@@ -114,7 +131,6 @@ jobs:
               *.zip)
                 echo "Contents of ZIP archive: $file"
                 unzip -l "$file" | awk 'NR>3 {print $4}' | while read filename; do
-                  # Skip empty or invalid filenames
                   if [ -z "$filename" ]; then
                     continue
                   fi
@@ -127,7 +143,6 @@ jobs:
               *.rar)
                 echo "Contents of RAR archive: $file"
                 7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
-                  # Skip empty or invalid filenames
                   if [ -z "$filename" ]; then
                     continue
                   fi
@@ -140,7 +155,6 @@ jobs:
               *.7z)
                 echo "Contents of 7z archive: $file"
                 7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
-                  # Skip empty or invalid filenames
                   if [ -z "$filename" ]; then
                     continue
                   fi
@@ -154,21 +168,15 @@ jobs:
                 echo "Mounting ISO: $file"
                 mount_point=$(mktemp -d)
                 sudo mount -o loop "$file" "$mount_point"
-                
                 find "$mount_point" -type f | while read filepath; do
                   if [[ "$filepath" =~ /[.]/ ]]; then
                     continue
                   fi
-                  
                   file_size=$(stat -c %s "$filepath")
                   readable_size=$(numfmt --to=iec --suffix=B "$file_size")
-                  
-                  # Используем Python для вычисления CRC32
-                  crc32_value=$(python3 -c "import zlib; import sys; f = open('$filepath', 'rb'); print(f'{zlib.crc32(f.read()) & 0xffffffff:08x}')")
-                  
+                  crc32_value=$(python3 -c "import zlib, sys; f = open('$filepath', 'rb'); print(f'{zlib.crc32(f.read()) & 0xffffffff:08x}')")
                   echo "File: $filepath, Size: $readable_size ($file_size bytes), CRC32: $crc32_value"
                 done
-                
                 sudo umount "$mount_point"
                 rmdir "$mount_point"
                 ;;
@@ -176,7 +184,6 @@ jobs:
                 echo "Checking IMG contents: $file"
                 mmls "$file" | awk '/\bUnallocated\b/ {next} {print $NF}' | while read partition; do
                   fls -r -p "$file" "$partition" | while read filepath; do
-                    # Skip empty or invalid filenames
                     if [ -z "$filepath" ]; then
                       continue
                     fi
@@ -195,7 +202,7 @@ jobs:
           done
 
       - name: File compression archive
-        run: |          
+        run: |
           echo "Compressing files..."
           if [ "${{ inputs.compression }}" != "none" ]; then
             case "${{ inputs.compression }}" in
