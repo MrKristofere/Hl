@@ -109,34 +109,33 @@ jobs:
                 # Если это HTML, значит мы не получили файл, а страницу. Используем Playwright.
                 echo "HTML page detected, attempting to download with Playwright..."
 
-# Используем Playwright для скачивания
-              node <<EOF
-const { chromium } = require('playwright');
+          node <<EOF
+          const { chromium } = require('playwright');
 
-(async () => {
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
-  await page.goto('$real_url');
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage();
+            await page.goto('$real_url');
 
-  // Дополнительные шаги для взаимодействия с кнопками, если это необходимо
-  // Например, кликнуть по кнопке загрузки:
-  // await page.click('button.download'); // Замените на ваш селектор, если требуется
+            // Дополнительные шаги для взаимодействия с кнопками, если это необходимо
+            // Например, кликнуть по кнопке загрузки:
+            // await page.click('button.download'); // Замените на ваш селектор, если требуется
 
-  const downloadUrl = await page.url();
-  console.log(\`Download URL: \${downloadUrl}\`);
+            const downloadUrl = await page.url();
+            console.log(\`Download URL: \${downloadUrl}\`);
 
-  // Ожидаем начала скачивания и получаем путь файла
-  const [download] = await Promise.all([
-    page.waitForEvent('download'),
-    page.click('a') // Замените селектор на ссылку или кнопку для скачивания
-  ]);
+            // Ожидаем начала скачивания и получаем путь файла
+            const [download] = await Promise.all([
+              page.waitForEvent('download'),
+              page.click('a') // Замените селектор на ссылку или кнопку для скачивания
+            ]);
 
-  const filePath = await download.path();
-  console.log('Файл скачан в', filePath);
+            const filePath = await download.path();
+            console.log('Файл скачан в', filePath);
 
-  await browser.close();
-})();
-EOF
+            await browser.close();
+          })();
+          EOF
                 else
                 # Если это прямой URL файла, добавляем его в список для aria2c
                 download_urls+=("$real_url")
