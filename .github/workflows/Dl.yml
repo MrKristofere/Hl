@@ -19,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
+      - name: Checkout
+        uses: actions/checkout@v4
+        
       - name: Cached APT
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
