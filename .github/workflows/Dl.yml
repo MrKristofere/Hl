@@ -15,18 +15,16 @@ permissions:
   contents: write
 
 jobs:
-  upload:
+  download:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the repository
-        uses: actions/checkout@v4
-        
+
       - name: Cached APT
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
           packages: aria2
           
-      - name: Parallel download
+      - name: Download
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -37,24 +35,17 @@ jobs:
           done
           wait
 
-      - name: Check if release exists
-        run: |
-          gh release view "${{ github.event.inputs.tag }}" || echo "Release not found"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-      - name: Create release if it doesn't exist
-        run: |
-          gh release create "${{ github.event.inputs.tag }}" dloa/* --title "Release for ${{ github.event.inputs.tag }}" --notes "Automated release"
-        if: failure()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload to release
-        run: |
-          for file in dloa/*; do
-            gh release upload "${{ github.event.inputs.tag }}" "$file" --clobber &
-          done
-          wait
+  upload:
+    runs-on: ubuntu-latest
+    needs: download
+    strategy:
+      matrix:
+        file: [dloa/*]
+    steps:
+      - name: Upload to release in parallel
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          files: ${{ matrix.file }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
