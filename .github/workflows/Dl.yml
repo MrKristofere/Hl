@@ -33,32 +33,26 @@ jobs:
 
           prepare_url() {
             local url="$1"
-      
             if [[ ! "$url" =~ ^https?:// ]]; then
               url="https://$url"
             fi
-
             urls_to_try=("$url")
             if [[ ! "$url" =~ ^https?://www\. ]]; then
-              urls_to_try+=("${url/https:\/\//https://www.}")
+          urls_to_try+=("${url/https:\/\//https://www.}")
             fi
-      
             echo "${urls_to_try[@]}"
           }
 
           echo "${{ github.event.inputs.upl }}" | \
-          sed 's/ , / __COMMA__ /g' | \
-          sed 's/ ; / __SEMICOLON__ /g' | \
-          sed 's/ ,/ __COMMA__ /g' | \
-          sed 's/ ;/ __SEMICOLON__ /g' | \
-          sed 's/, / __COMMA__ /g' | \
-          sed 's/;/ __SEMICOLON__ /g' | \
-          sed 's/[[:space:]]\+/ /g' | \
-          tr -s ' ' '\n' | \
-          while read -r url; do
-            url=$(echo "$url" | sed 's/__COMMA__/,/g' | sed 's/__SEMICOLON__/;/g')
-            prepare_url "$url"
-          done | xargs -P 4 -I {} bash -c 'aria2c -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true -l dloa/aria2.log "$1" || exit 123' _ {}
+            sed 's/,/ , /g' | \
+            sed 's/;/ ; /g' | \
+            sed 's/[[:space:]]\+/ /g' | \
+            tr ' ' '\n' | \
+            grep -E '^https?://' | \
+            while read -r url; do
+              url=$(echo "$url" | sed 's/__COMMA__/,/g' | sed 's/__SEMICOLON__/;/g')
+              prepare_url "$url"
+            done | xargs -P 4 -I {} bash -c 'aria2c -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true -l dloa/aria2.log "$1" || exit 123' _ {}
       
       - name: Check files in dloa directory
         run: |
