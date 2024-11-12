@@ -18,7 +18,6 @@ jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
         
@@ -27,15 +26,16 @@ jobs:
         with:
           packages: aria2
           
-      - name: Download
+      - name: Download files
         run: |
           mkdir -p dloa
-          IFS=',' read -r -a urls <<< "${{ github.event.inputs.upl }}"
-          for url in "${urls[@]}"; do
-            aria2c -d dloa -x 16 -s 16 --continue=true "$url" &
-          done
-          wait
-          
+          IFS=$'\n'
+          echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | xargs -n 4 -P 4 -I {} aria2c -d dloa \
+            --split=8 \
+            --max-connection-per-server=4 \
+            --min-split-size=5M \
+            --continue=true "{}"
+
       - name: Check files in dloa directory
         run: |
           echo "Files in dloa directory:"
@@ -50,9 +50,7 @@ jobs:
 
       - name: Upload files to release
         run: |
-          for file in dloa/*; do
-            gh release upload "${{ github.event.inputs.tag }}" "$file" --clobber &
-          done
-          wait
+          IFS=$'\n'
+          ls dloa/* | xargs -n 4 -P 4 -I {} gh release upload "${{ github.event.inputs.tag }}" "{}" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
