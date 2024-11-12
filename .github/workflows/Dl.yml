@@ -34,6 +34,11 @@ jobs:
             aria2c -d dloa -x 16 -s 16 --continue=true "$url" &
           done
           wait
+          
+      - name: Check files in dloa directory
+        run: |
+          echo "Files in dloa directory:"
+          ls -alh dloa/
 
   upload:
     runs-on: ubuntu-latest
