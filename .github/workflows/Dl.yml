@@ -18,19 +18,27 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      - name: upd
+      - name: APT update
         run: |
           sudo apt-get update
-      - name: cache apt
+      - name: Cached APT
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
           packages: aria2
-          version: 1.0
       - name: download
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          aria2c -d dloa '${{ inputs.upl }}'
+          mkdir -p dloa
+          IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
+          for url in "${urls[@]}"; do
+          aria2c -d dloa -x 16 -s 16 --continue=true "$url" &
+          done
+          wait
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         with:
           files: dloa/*
           tag_name: ${{ inputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
