@@ -48,7 +48,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload files to release in parallel
+      - name: Upload files to release
         run: |
           for file in dloa/*; do
             gh release upload "${{ github.event.inputs.tag }}" "$file" --clobber &
