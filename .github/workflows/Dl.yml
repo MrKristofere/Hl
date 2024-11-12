@@ -46,7 +46,8 @@ jobs:
             echo "${urls_to_try[@]}"
           }
 
-          echo "${{ github.event.inputs.upl }}" | sed 's/[;,]\?\s*/ /g' | tr -s ' ' '\n' | while read -r url; do
+          echo "${{ github.event.inputs.upl }}" | sed 's/[^\ ],/\1__COMMA__/g' | sed 's/[^\ ];/\1__SEMICOLON__/g' | sed 's/[;,]\?\s*/ /g' | tr -s ' ' '\n' | while read -r url; do
+            url=$(echo "$url" | sed 's/__COMMA__/,/g' | sed 's/__SEMICOLON__/;/g')
             prepare_url "$url"
           done | tr ' ' '\n' | xargs -P 4 -I {} bash -c 'aria2c -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true "$1" && exit 0' _ {}
       
