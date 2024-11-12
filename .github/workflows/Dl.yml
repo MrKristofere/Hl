@@ -26,7 +26,7 @@ jobs:
         with:
           packages: aria2
           
-      - name: Parallel Download and Upload
+      - name: Parallel download
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -36,14 +36,25 @@ jobs:
             aria2c -d dloa -x 16 -s 16 --continue=true "$url" &
           done
           wait
+
+      - name: Check if release exists
+        run: |
+          gh release view "${{ github.event.inputs.tag }}" || echo "Release not found"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+      - name: Create release if it doesn't exist
+        run: |
+          gh release create "${{ github.event.inputs.tag }}" dloa/* --title "Release for ${{ github.event.inputs.tag }}" --notes "Automated release"
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to release
+        run: |
           for file in dloa/*; do
             gh release upload "${{ github.event.inputs.tag }}" "$file" --clobber &
           done
           wait
-
-      - name: Publish Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
