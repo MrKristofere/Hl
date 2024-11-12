@@ -108,10 +108,10 @@ jobs:
               if [[ -z "$file_extension" || "$(curl -s -I "$real_url" | head -n 1)" =~ "HTTP/2 301" || "$(curl -s -I "$real_url" | head -n 1)" =~ "HTTP/2 302" ]]; then
                 echo "HTML page detected or file without extension, attempting to download with Playwright..."
   
-                node <<'EOF'
-                const { chromium } = require('playwright');
+          node <<'EOF'
+          const { chromium } = require('playwright');
   
-                (async () => {
+          (async () => {
                   const browser = await chromium.launch({ headless: true });
                   const page = await browser.newPage();
                   await page.goto('$real_url', { waitUntil: 'networkidle' });
@@ -133,8 +133,8 @@ jobs:
                   console.log('Файл скачан в', filePath);
 
                   await browser.close();
-                })();
-                EOF
+          })();
+          EOF
               else
                 # Если это прямой URL файла, добавляем его в список для aria2c
                 download_urls+=("$real_url")
