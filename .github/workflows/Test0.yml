@@ -109,8 +109,8 @@ jobs:
                 # Если это HTML, значит мы не получили файл, а страницу. Используем Playwright.
                 echo "HTML page detected, attempting to download with Playwright..."
 
-                # Используем Playwright для скачивания
-                node <<EOF
+# Используем Playwright для скачивания
+              node <<EOF
 const { chromium } = require('playwright');
 
 (async () => {
@@ -118,17 +118,17 @@ const { chromium } = require('playwright');
   const page = await browser.newPage();
   await page.goto('$real_url');
 
-  // Здесь вы можете добавить дополнительные шаги для взаимодействия с кнопками, если это необходимо
-  // Пример, если нужно кликнуть по кнопке для загрузки:
-  // await page.click('button.download'); // Замените на ваш селектор
+  // Дополнительные шаги для взаимодействия с кнопками, если это необходимо
+  // Например, кликнуть по кнопке загрузки:
+  // await page.click('button.download'); // Замените на ваш селектор, если требуется
 
   const downloadUrl = await page.url();
   console.log(\`Download URL: \${downloadUrl}\`);
 
-  // Скачиваем файл по сгенерированной ссылке
+  // Ожидаем начала скачивания и получаем путь файла
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.click('a') // Замените селектор на ссылку или кнопку для скачивания, если необходимо
+    page.click('a') // Замените селектор на ссылку или кнопку для скачивания
   ]);
 
   const filePath = await download.path();
