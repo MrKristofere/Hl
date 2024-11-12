@@ -75,6 +75,7 @@ jobs:
           echo "Installing pip dependencies..."
           pip3 install crc32c playwright
           echo "Dependencies installed."
+
       - name: Download files from URLs and GitHub Releases
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -111,30 +112,30 @@ jobs:
 
                 # Используем Playwright для скачивания
                 node <<EOF
-              const { chromium } = require('playwright');
+const { chromium } = require('playwright');
 
-              (async () => {
-                const browser = await chromium.launch({ headless: true });
-                const page = await browser.newPage();
-                await page.goto('$real_url');
-  
-                // Здесь вы можете добавить дополнительные шаги для взаимодействия с кнопками, если это необходимо
-                // Пример, если нужно кликнуть по кнопке для загрузки:
-                // await page.click('button.download'); // Замените на ваш селектор
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.goto('$real_url');
 
-                const downloadUrl = await page.url();
-                console.log(\`Download URL: \${downloadUrl}\`);
-  
-                // Скачиваем файл по сгенерированной ссылке
-                await page.goto(downloadUrl);
-                const filePath = await page.download({ path: 'dloa/file_downloaded' });
+  // Здесь вы можете добавить дополнительные шаги для взаимодействия с кнопками, если это необходимо
+  // Пример, если нужно кликнуть по кнопке для загрузки:
+  // await page.click('button.download'); // Замените на ваш селектор
 
-                console.log('File downloaded to', filePath);
+  const downloadUrl = await page.url();
+  console.log(\`Download URL: \${downloadUrl}\`);
 
-                await browser.close();
-              })();
-              EOF
-                else
+  // Скачиваем файл по сгенерированной ссылке
+  await page.goto(downloadUrl);
+  const filePath = await page.download({ path: 'dloa/file_downloaded' });
+
+  console.log('File downloaded to', filePath);
+
+  await browser.close();
+})();
+EOF
+              else
                 # Если это прямой URL файла, добавляем его в список для aria2c
                 download_urls+=("$real_url")
               fi
@@ -147,7 +148,7 @@ jobs:
 
           # Загрузка файлов с помощью aria2c
           aria2c -i urls.txt -d dloa -x 16 -s 16 --continue=true --auto-file-renaming=false
-      
+
       - name: Verify downloaded files
         run: |
           ls -lh dloa
