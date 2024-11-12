@@ -104,39 +104,38 @@ jobs:
               real_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$url")
               file_extension="${real_url##*.}"
 
-              # Проверяем, не HTML ли это
-              if curl -s -I "$real_url" | grep -q "text/html"; then
-                # Если это HTML, значит мы не получили файл, а страницу. Используем Playwright.
-                echo "HTML page detected, attempting to download with Playwright..."
+              # Проверяем, если URL не содержит расширения или это HTML
+              if [[ -z "$file_extension" || "$(curl -s -I "$real_url" | head -n 1)" =~ "HTTP/2 301" || "$(curl -s -I "$real_url" | head -n 1)" =~ "HTTP/2 302" ]]; then
+                echo "HTML page detected or file without extension, attempting to download with Playwright..."
+  
+                node <<EOF
+                const { chromium } = require('playwright');
+  
+                (async () => {
+                  const browser = await chromium.launch({ headless: true });
+                  const page = await browser.newPage();
+                  await page.goto('$real_url', { waitUntil: 'networkidle' });
 
-          node <<EOF
-          const { chromium } = require('playwright');
+                  // Дополнительные шаги для взаимодействия с кнопками, если это необходимо
+                  // Например, кликнуть по кнопке загрузки:
+                  // await page.click('button.download'); // Замените на ваш селектор, если требуется
 
-          (async () => {
-            const browser = await chromium.launch({ headless: true });
-            const page = await browser.newPage();
-            await page.goto('$real_url');
+                  const downloadUrl = await page.url();
+                  console.log(\`Download URL: \${downloadUrl}\`);
 
-            // Дополнительные шаги для взаимодействия с кнопками, если это необходимо
-            // Например, кликнуть по кнопке загрузки:
-            // await page.click('button.download'); // Замените на ваш селектор, если требуется
+                  // Ожидаем начала скачивания и получаем путь файла
+                  const [download] = await Promise.all([
+                    page.waitForEvent('download'),
+                    page.click('a') // Замените селектор на ссылку или кнопку для скачивания
+                  ]);
 
-            const downloadUrl = await page.url();
-            console.log(\`Download URL: \${downloadUrl}\`);
+                  const filePath = await download.path();
+                  console.log('Файл скачан в', filePath);
 
-            // Ожидаем начала скачивания и получаем путь файла
-            const [download] = await Promise.all([
-              page.waitForEvent('download'),
-              page.click('a') // Замените селектор на ссылку или кнопку для скачивания
-            ]);
-
-            const filePath = await download.path();
-            console.log('Файл скачан в', filePath);
-
-            await browser.close();
-          })();
-          EOF
-                else
+                  await browser.close();
+                })();
+                EOF
+              else
                 # Если это прямой URL файла, добавляем его в список для aria2c
                 download_urls+=("$real_url")
               fi
