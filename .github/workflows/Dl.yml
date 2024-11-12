@@ -30,10 +30,10 @@ jobs:
         run: |
           mkdir -p dloa
           IFS=$'\n'
-          
+
           prepare_url() {
             local url="$1"
-            
+      
             if [[ ! "$url" =~ ^https?:// ]]; then
               url="https://$url"
             fi
@@ -42,14 +42,14 @@ jobs:
             if [[ ! "$url" =~ ^https?://www\. ]]; then
               urls_to_try+=("${url/https:\/\//https://www.}")
             fi
-            
+      
             echo "${urls_to_try[@]}"
           }
 
-          echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | while read -r url; do
+          echo "${{ github.event.inputs.upl }}" | sed 's/,/ /g' | tr -s ' ' '\n' | while read -r url; do
             prepare_url "$url"
           done | tr ' ' '\n' | xargs -P 4 -I {} bash -c 'aria2c -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true "$1" && exit 0' _ {}
-
+      
       - name: Check files in dloa directory
         run: |
           echo "Files in dloa directory:"
