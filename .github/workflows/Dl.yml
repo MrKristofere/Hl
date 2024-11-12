@@ -18,9 +18,9 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      - name: APT Update
-        run: |
-          sudo apt-get update
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        
       - name: Cached APT
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
