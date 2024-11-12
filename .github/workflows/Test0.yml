@@ -110,7 +110,7 @@ jobs:
               if [[ -z "$file_extension" || "$content_type" == "text/html" || "$(curl -s -I "$real_url" | head -n 1)" =~ "HTTP/2 301" || "$(curl -s -I "$real_url" | head -n 1)" =~ "HTTP/2 302" ]]; then
                 echo "HTML page detected or file without extension, attempting to download with Playwright..."
 
-                node <<'EOF'
+                node <<EOF
                 const { chromium } = require('playwright');
 
                 (async () => {
