@@ -277,7 +277,9 @@ EOF
             dloa/*
             dloa_compressed.*
           tag_name: ${{ inputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Confirm Upload
         run: |
-          echo "Files uploaded to GitHub Release."
+          echo "Files uploaded to GitHub Release under tag: ${{ inputs.tag }}"
