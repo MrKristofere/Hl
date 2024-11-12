@@ -25,8 +25,6 @@ jobs:
           packages: aria2
           
       - name: Download
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p dloa
           IFS=',' read -r -a urls <<< "${{ github.event.inputs.upl }}"
@@ -40,17 +38,18 @@ jobs:
           echo "Files in dloa directory:"
           ls -alh dloa/
 
-  upload:
-    runs-on: ubuntu-latest
-    needs: download
-    strategy:
-      matrix:
-        file: [dloa/*]
-    steps:
-      - name: Upload to release in parallel
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag }}
-          files: ${{ matrix.file }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload files to release in parallel
+        run: |
+          for file in dloa/*; do
+            gh release upload "${{ github.event.inputs.tag }}" "$file" --clobber &
+          done
+          wait
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
