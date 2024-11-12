@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       upl:
-        description: 'URL file'
+        description: 'Direct links separated by commas'
         required: true
         type: string
       tag:
@@ -18,27 +18,32 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      - name: APT update
+      - name: APT Update
         run: |
           sudo apt-get update
       - name: Cached APT
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
           packages: aria2
-      - name: download
+          
+      - name: Parallel Download and Upload
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p dloa
-          IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
+          IFS=',' read -r -a urls <<< "${{ github.event.inputs.upl }}"
           for url in "${urls[@]}"; do
-          aria2c -d dloa -x 16 -s 16 --continue=true "$url" &
+            aria2c -d dloa -x 16 -s 16 --continue=true "$url" &
           done
           wait
-      - name: Upload Release
+          for file in dloa/*; do
+            gh release upload "${{ github.event.inputs.tag }}" "$file" --clobber &
+          done
+          wait
+
+      - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dloa/*
-          tag_name: ${{ inputs.tag }}
+          tag_name: ${{ github.event.inputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
