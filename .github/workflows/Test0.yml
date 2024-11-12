@@ -105,36 +105,65 @@ jobs:
               file_extension="${real_url##*.}"
 
               # Проверяем, если URL не содержит расширения или это HTML
-              if [[ -z "$file_extension" || "$(curl -s -I "$real_url" | head -n 1)" =~ "HTTP/2 301" || "$(curl -s -I "$real_url" | head -n 1)" =~ "HTTP/2 302" ]]; then
+              content_type=$(curl -s -I "$real_url" | grep -i "Content-Type" | awk '{print $2}' | tr -d '\r')
+
+              if [[ -z "$file_extension" || "$content_type" == "text/html" || "$(curl -s -I "$real_url" | head -n 1)" =~ "HTTP/2 301" || "$(curl -s -I "$real_url" | head -n 1)" =~ "HTTP/2 302" ]]; then
                 echo "HTML page detected or file without extension, attempting to download with Playwright..."
-  
-          node <<'EOF'
-          const { chromium } = require('playwright');
-  
-          (async () => {
+
+                node <<'EOF'
+                const { chromium } = require('playwright');
+
+                (async () => {
                   const browser = await chromium.launch({ headless: true });
                   const page = await browser.newPage();
-                  await page.goto('$real_url', { waitUntil: 'networkidle' });
 
-                  // Дополнительные шаги для взаимодействия с кнопками, если это необходимо
-                  // Например, кликнуть по кнопке загрузки:
-                  // await page.click('button.download'); // Замените на ваш селектор, если требуется
+                  // Устанавливаем заголовки для имитации реального браузера
+                  await page.setExtraHTTPHeaders({
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Connection': 'keep-alive',
+                   });
 
-                  const downloadUrl = await page.url();
-                  console.log(\`Download URL: \${downloadUrl}\`);
-
-                  // Ожидаем начала скачивания и получаем путь файла
-                  const [download] = await Promise.all([
-                    page.waitForEvent('download'),
-                    page.click('a') // Замените селектор на ссылку или кнопку для скачивания
+                  // Если необходимо, можно добавить cookies
+                  await page.context().addCookies([
+                    {
+                      name: 'session_id',
+                      value: 'your_session_id_here',
+                      domain: 'example.com',
+                      path: '/',
+                      httpOnly: true,
+                      secure: true,
+                    },
                   ]);
 
-                  const filePath = await download.path();
-                  console.log('Файл скачан в', filePath);
+                  try {
+                    // Пытаемся открыть страницу с ожиданием загрузки всех сетевых запросов
+                    await page.goto('$real_url', { waitUntil: 'networkidle', timeout: 60000 });
 
-                  await browser.close();
-          })();
-          EOF
+                    // Если на странице есть кнопка для скачивания, можно добавить взаимодействие:
+                    // await page.click('button.download'); // Замените на ваш селектор, если требуется
+
+                    // Получаем URL страницы, на которой производится скачивание
+                       const downloadUrl = await page.url();
+                       console.log(`Download URL: ${downloadUrl}`);
+
+                    // Ожидаем начала скачивания файла
+                       const [download] = await Promise.all([
+                      page.waitForEvent('download'),
+                      page.click('a') // Замените на ваш селектор для скачивания
+                    ]);
+
+                    const filePath = await download.path();
+                    console.log('Файл скачан в', filePath);
+
+                  } catch (error) {
+                    console.error("Ошибка при скачивании с использованием Playwright:", error);
+                  } finally {
+                    await browser.close();
+                  }
+                })();
+                EOF
               else
                 # Если это прямой URL файла, добавляем его в список для aria2c
                 download_urls+=("$real_url")
