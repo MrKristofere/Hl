@@ -113,12 +113,11 @@ jobs:
       - name: Send file to Telegram
         run: |
           set +x
-          file_to_send=$(ls dloa | head -n 1)
-          file_path="dloa/$file_to_send"
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
-          -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-          -F document=@"$file_path" > /dev/null 2>&1
-
+          for file in dloa/*; do
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
+              -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -F document=@"$file" > /dev/null 2>&1
+          done
          
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
