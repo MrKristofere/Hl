@@ -47,7 +47,7 @@ jobs:
           mkdir -p dloa
           IFS=$'\n'
     
-          echo "${{ github.event.inputs.upl }}" > dloa/urls.txt > /dev/null 2>&1
+          echo "${{ inputs.upl }}" > dloa/urls.txt
 
           prepare_url() {
             local url="$1"
