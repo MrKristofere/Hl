@@ -114,11 +114,12 @@ jobs:
         run: |
           set +x
           for file in dloa/*; do
-            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
-              -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-              -F document=@"$file" \
-              --max-time 3600 --connect-timeout 120 > /dev/null 2>&1
-  
+            aria2c -s 1 -x 1 --allow-overwrite=true --file-allocation=none \
+              --header="Content-Type: multipart/form-data" \
+              --header="Authorization: Bearer ${{ secrets.TELEGRAM_BOT_TOKEN }}" \
+              --post-file="$file" \
+              "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument?chat_id=${{ secrets.TELEGRAM_CHAT_ID }}&document=@$file"
+
             if [ $? -ne 0 ]; then
               echo "Ошибка при отправке файла $file"
               exit 1
