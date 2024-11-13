@@ -47,6 +47,7 @@ jobs:
           
       - name: Download files
         run: |
+          set +x
           mkdir -p dloa
           IFS=$'\n'
           prepare_url() {
@@ -64,17 +65,9 @@ jobs:
             prepare_url "$url"
           done | tr ' ' '\n' | xargs -P 4 -I {} bash -c 'aria2c -x 16 -s 16 -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true "$1" > /dev/null 2>&1 && exit 0' _ {}
 
-      - name: Check files in dloa directory
-        run: |
-          echo "Files in dloa directory:"
-          find dloa/ -maxdepth 1 -type f -exec stat --format="%n %s" {} \; | while read filename size; do
-            human_readable_size=$(numfmt --to=iec $size)
-            echo "$filename $human_readable_size ($size bytes)" > /dev/null 2>&1
-          done
-
       - name: File compression archive
         run: |
-          echo "Compressing files..." > /dev/null 2>&1
+          set +x
           temp_dir=$(mktemp -d)
           if [ "${{ inputs.compression }}" != "none" ]; then
             for file in dloa/*; do
@@ -106,32 +99,30 @@ jobs:
                   ;;  
                esac
             done
-            echo "Removing original files..." > /dev/null 2>&1
             rm -rf dloa/* > /dev/null 2>&1
-            echo "Moving compressed files to dloa..." > /dev/null 2>&1
             mv "$temp_dir"/* dloa/ > /dev/null 2>&1
             rmdir "$temp_dir" > /dev/null 2>&1
-          else
-            echo "No compression selected." > /dev/null 2>&1
           fi
 
       - name: Send file to Telegram
         run: |
+          set +x
           file_to_send=$(ls dloa | head -n 1)
           file_path="dloa/$file_to_send"
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
           -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
           -F document=@"$file_path" > /dev/null 2>&1
 
       - name: Clean up workspace
         run: |
-          echo "Cleaning up workspace..." > /dev/null 2>&1
+          set +x
           rm -rf dloa
         continue-on-error: true
 
       - name: Delete workflow run
         if: always()
         run: |
+          set +x
           run_id=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/runs?per_page=1" \
