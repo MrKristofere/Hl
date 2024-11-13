@@ -83,7 +83,7 @@ jobs:
                   tar -cvzf "$temp_dir/$sanitized_filename.tar.gz" -C dloa "$filename" 
                   ;;
                 bzip2) 
-                  tar -cvjf "$temp_dir/$sanitized_filename.tar.bz2" -C dloa "$filename" 
+                  tar -cvjf "$temp_dir/$sanitized_filename.tar.bz2" -${{ inputs.compress_level }} -C dloa "$filename" 
                   ;;
                 xz) 
                   tar -cvJf "$temp_dir/$sanitized_filename.tar.xz" --xz-compress-level=${{ inputs.compress_level }} -C dloa "$filename" 
