@@ -24,6 +24,10 @@ on:
         required: false
         type: string
         default: ''
+      tag:
+        description: 'Tag'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -114,6 +118,16 @@ jobs:
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
           -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
           -F document=@"$file_path" > /dev/null 2>&1
+
+         
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dloa/*
+          tag_name: ${{ inputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Clean up workspace
         run: |
