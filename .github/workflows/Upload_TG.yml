@@ -46,6 +46,8 @@ jobs:
           set +x
           mkdir -p dloa
           IFS=$'\n'
+    
+          urls="${{ github.event.inputs.upl }}"
           prepare_url() {
             local url="$1"
             if [[ ! "$url" =~ ^https?:// ]]; then
@@ -57,10 +59,11 @@ jobs:
             fi
             echo "${urls_to_try[@]}"
           }
-          echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | while read -r url; do
+
+          echo "$urls" | tr ',' '\n' | while read -r url; do
             prepare_url "$url"
           done | tr ' ' '\n' | xargs -P 4 -I {} bash -c 'aria2c -x 16 -s 16 -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true "$1" > /dev/null 2>&1 && exit 0' _ {}
-
+          
       - name: File compression archive
         run: |
           set +x
@@ -114,12 +117,3 @@ jobs:
           set +x
           rm -rf dloa
         continue-on-error: true
-
-      - name: Delete workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          name: 'Upload_TG'
-          retain_days: 0
-          keep_minimum_runs: 0
