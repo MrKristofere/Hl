@@ -69,6 +69,7 @@ jobs:
         run: |
           echo "Files in dloa directory:"
           ls -alh dloa/ | awk '{ print $9, "(", $5, "bytes)" }'
+          
       - name: File compression archive
         run: |
           echo "Compressing files..."
