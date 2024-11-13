@@ -43,7 +43,7 @@ jobs:
       - name: Cached APT
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: aria2 gh p7zip-full xz-utils jq python3
+          packages: aria2 gh p7zip-full xz-utils jq curl
           
       - name: Download files
         run: |
@@ -113,20 +113,16 @@ jobs:
       - name: Send file to Telegram
         run: |
           set +x
-          import os
-          import requests
-
-          bot_token = os.environ['TELEGRAM_BOT_TOKEN']
-          chat_id = os.environ['TELEGRAM_CHAT_ID']
-          url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
-
-          for file_name in os.listdir("dloa"):
-            file_path = os.path.join("dloa", file_name)
-            with open(file_path, 'rb') as file:
-              response = requests.post(url, data={'chat_id': chat_id}, files={'document': file})
-              if response.status_code != 200:
-                print(f"Ошибка при отправке файла {file_name}")
-                break
+          for file in dloa/*; do
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
+              -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -F document=@"$file" > /dev/null 2>&1
+  
+            if [ $? -ne 0 ]; then
+              echo "Ошибка при отправке файла $file"
+              exit 1
+            fi
+          done
          
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
