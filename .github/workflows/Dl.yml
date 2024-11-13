@@ -10,6 +10,23 @@ on:
         description: 'Tag'
         required: true
         type: string
+      compression:
+        description: 'Compression method'
+        required: false
+        type: choice
+        options:
+          - none
+          - gzip
+          - bzip2
+          - xz
+          - rar
+          - 7z
+          - zip
+      compress_level:
+        description: 'Compression level (1-9)'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -51,6 +68,28 @@ jobs:
         run: |
           echo "Files in dloa directory:"
           ls -alh dloa/
+
+      - name: File compression archive
+        run: |
+          echo "Compressing files..."
+          if [ "${{ inputs.compression }}" != "none" ]; then
+            for file in dloa/*; do
+              filename=$(basename "$file")
+        
+              sanitized_filename=$(echo "$filename" | sed 's/[^a-zA-Z0-9._-]/_/g')
+
+              case "${{ inputs.compression }}" in
+                gzip) tar -cvzf "${sanitized_filename}.tar.gz" -C dloa "$filename" ;;
+                bzip2) tar -cvjf "${sanitized_filename}.tar.bz2" -C dloa "$filename" ;;
+                xz) tar -cvJf "${sanitized_filename}.tar.xz" -C dloa "$filename" ;;
+                rar) 7z a -m0=rar -mx${{ inputs.compress_level }} "${sanitized_filename}.rar" "$file" ;;
+                7z) 7z a -mx${{ inputs.compress_level }} "${sanitized_filename}.7z" "$file" ;;
+                zip) 7z a -tzip -mx${{ inputs.compress_level }} "${sanitized_filename}.zip" "$file" ;;
+              esac
+            done
+          else
+            echo "No compression selected."
+          fi
 
       - name: Create release
         uses: softprops/action-gh-release@v2
