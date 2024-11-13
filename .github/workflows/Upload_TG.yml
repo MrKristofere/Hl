@@ -31,6 +31,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   download:
@@ -42,13 +43,12 @@ jobs:
       - name: Cached APT
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: aria2 gh p7zip-full xz-utils
+          packages: aria2 gh p7zip-full xz-utils jq
           
       - name: Download files
         run: |
           mkdir -p dloa
           IFS=$'\n'
-
           prepare_url() {
             local url="$1"
             if [[ ! "$url" =~ ^https?:// ]]; then
@@ -60,7 +60,6 @@ jobs:
             fi
             echo "${urls_to_try[@]}"
           }
-
           echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | while read -r url; do
             prepare_url "$url"
           done | tr ' ' '\n' | xargs -P 4 -I {} bash -c 'aria2c -x 16 -s 16 -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true "$1" > /dev/null 2>&1 && exit 0' _ {}
@@ -77,12 +76,10 @@ jobs:
         run: |
           echo "Compressing files..." > /dev/null 2>&1
           temp_dir=$(mktemp -d)
-
           if [ "${{ inputs.compression }}" != "none" ]; then
             for file in dloa/*; do
               filename=$(basename "$file")
               sanitized_filename=$(echo "$filename" | sed 's/[^a-zA-Z0-9._-]/_/g')
-
               case "${{ inputs.compression }}" in
                 gzip) 
                   tar -cvf - "$file" | gzip -${{ inputs.compress_level }} > "$temp_dir/$sanitized_filename.tar.gz" 2>/dev/null
@@ -109,26 +106,19 @@ jobs:
                   ;;  
                esac
             done
-
             echo "Removing original files..." > /dev/null 2>&1
             rm -rf dloa/* > /dev/null 2>&1
-
             echo "Moving compressed files to dloa..." > /dev/null 2>&1
             mv "$temp_dir"/* dloa/ > /dev/null 2>&1
-
             rmdir "$temp_dir" > /dev/null 2>&1
-      
           else
             echo "No compression selected." > /dev/null 2>&1
           fi
 
       - name: Send file to Telegram
         run: |
-          # Скачиваем первый файл из dloa/
           file_to_send=$(ls dloa | head -n 1)
           file_path="dloa/$file_to_send"
-
-          # Отправка файла в Telegram
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
           -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
           -F document=@"$file_path" > /dev/null 2>&1
@@ -138,3 +128,17 @@ jobs:
           echo "Cleaning up workspace..." > /dev/null 2>&1
           rm -rf dloa
         continue-on-error: true
+
+      - name: Delete workflow run
+        if: always()
+        run: |
+          run_id=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs?per_page=1" \
+            | jq -r ".workflow_runs[0].id")
+          curl -s -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/$run_id"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
