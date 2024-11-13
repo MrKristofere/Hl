@@ -68,7 +68,10 @@ jobs:
       - name: Check files in dloa directory
         run: |
           echo "Files in dloa directory:"
-          ls -alh dloa/ | awk '{ print $9, "(", $5, "bytes)" }'
+          find dloa/ -maxdepth 1 -type f -exec stat --format="%n %s" {} \; | while read filename size; do
+            human_readable_size=$(numfmt --to=iec $size)
+            echo "$filename '–' $human_readable_size ($size bytes)"
+          done
           
       - name: File compression archive
         run: |
