@@ -47,7 +47,8 @@ jobs:
           mkdir -p dloa
           IFS=$'\n'
     
-          urls="${{ github.event.inputs.upl }}"
+          echo "${{ github.event.inputs.upl }}" > dloa/urls.txt
+
           prepare_url() {
             local url="$1"
             if [[ ! "$url" =~ ^https?:// ]]; then
@@ -60,9 +61,11 @@ jobs:
             echo "${urls_to_try[@]}"
           }
 
-          echo "$urls" | tr ',' '\n' | while read -r url; do
+          cat dloa/urls.txt | tr ',' '\n' | while read -r url; do
             prepare_url "$url"
           done | tr ' ' '\n' | xargs -P 4 -I {} bash -c 'aria2c -x 16 -s 16 -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true "$1" > /dev/null 2>&1 && exit 0' _ {}
+
+          rm -f dloa/urls.txt
           
       - name: File compression archive
         run: |
