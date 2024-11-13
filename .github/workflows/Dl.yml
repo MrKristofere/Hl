@@ -41,7 +41,7 @@ jobs:
       - name: Cached APT
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: aria2 gh coreutils
+          packages: aria2 gh coreutils p7zip-full
           
       - name: Download files
         run: |
@@ -86,7 +86,7 @@ jobs:
                   tar -cvjf "$temp_dir/$sanitized_filename.tar.bz2" -C dloa "$filename" 
                   ;;
                 xz) 
-                  tar -cvJf "$temp_dir/$sanitized_filename.tar.xz" -C dloa "$filename" 
+                  tar -cvJf "$temp_dir/$sanitized_filename.tar.xz" --xz-compress-level=${{ inputs.compress_level }} -C dloa "$filename" 
                   ;;
                rar)  
                   7z a -m0=rar -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.rar" "$file" 
