@@ -58,7 +58,7 @@ jobs:
         id: apt-cache
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: aria2 curl jq unzip p7zip-full crc32 util-linux numfmt rsync zip gzip bzip2 xz-utils parted genisoimage cdrtools tar arj cabextract python3-pip
+          packages: aria2 curl jq unzip p7zip-full libarchive-zip-perl util-linux coreutils rsync zip gzip bzip2 xz-utils parted genisoimage cdrtools tar arj cabextract python3-pip
 
       - name: Cache Python dependencies
         id: pip-cache
