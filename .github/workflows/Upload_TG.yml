@@ -44,8 +44,6 @@ jobs:
       - name: Download files
         run: |
           set +x
-            env:
-              DOWNLOAD_URLS: "${{ github.event.inputs.upl }}"
           mkdir -p dloa
           IFS=$'\n'
           printf "%s" "$DOWNLOAD_URLS" > dloa/urls.txt
@@ -67,6 +65,8 @@ jobs:
           done | tr ' ' '\n' | xargs -P 4 -I {} bash -c 'aria2c -x 16 -s 16 -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true "$1" > /dev/null 2>&1 && exit 0' _ {}
 
           rm -f dloa/urls.txt
+        env:
+          DOWNLOAD_URLS: "${{ github.event.inputs.upl }}"
           
       - name: File compression archive
         run: |
