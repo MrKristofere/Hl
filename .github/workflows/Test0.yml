@@ -284,23 +284,47 @@ jobs:
       - name: File compression archive
         run: |
           echo "Compressing files..."
+          # Создаём временную папку для архивов
+          temp_dir=$(mktemp -d)
+
           if [ "${{ inputs.compression }}" != "none" ]; then
             for file in dloa/*; do
-              # Извлекаем имя файла без пути
               filename=$(basename "$file")
-        
-              # Заменяем запрещённые символы (например, пробелы, двоеточия, слэши и т.д.) на "_"
               sanitized_filename=$(echo "$filename" | sed 's/[^a-zA-Z0-9._-]/_/g')
 
               case "${{ inputs.compression }}" in
-                gzip) tar -cvzf "${sanitized_filename}.tar.gz" -C dloa "$filename" ;;
-                bzip2) tar -cvjf "${sanitized_filename}.tar.bz2" -C dloa "$filename" ;;
-                xz) tar -cvJf "${sanitized_filename}.tar.xz" -C dloa "$filename" ;;
-                rar) 7z a -m0=rar -mx${{ inputs.compress_level }} "${sanitized_filename}.rar" "$file" ;;
-                7z) 7z a -mx${{ inputs.compress_level }} "${sanitized_filename}.7z" "$file" ;;
-                zip) 7z a -tzip -mx${{ inputs.compress_level }} "${sanitized_filename}.zip" "$file" ;;
-              esac
+                gzip) 
+                  tar -cvzf "$temp_dir/$sanitized_filename.tar.gz" -C dloa "$filename" 
+                  ;;
+                bzip2) 
+                  tar -cvjf "$temp_dir/$sanitized_filename.tar.bz2" -C dloa "$filename" 
+                  ;;
+                xz) 
+                  tar -cvJf "$temp_dir/$sanitized_filename.tar.xz" -C dloa "$filename" 
+                  ;;
+               rar)  
+                  7z a -m0=rar -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.rar" "$file" 
+                  ;;
+               7z) 
+                  7z a -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.7z" "$file" 
+                  ;;
+               zip) 
+                  7z a -tzip -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.zip" "$file" 
+                  ;;
+               esac
             done
+
+            # Удаляем исходные файлы в папке dloa
+            echo "Removing original files..."
+            rm -rf dloa/*
+
+            # После сжатия перемещаем архивы в папку dloa
+            echo "Moving compressed files to dloa..."
+            mv "$temp_dir"/* dloa/
+
+            # Удаляем временную папку
+            rmdir "$temp_dir"
+      
           else
             echo "No compression selected."
           fi
