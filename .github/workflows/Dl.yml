@@ -80,7 +80,7 @@ jobs:
 
               case "${{ inputs.compression }}" in
                 gzip) 
-                  tar -cvzf "$temp_dir/$sanitized_filename.tar.gz" -C dloa "$filename" 
+                  tar -cvzf "$temp_dir/$sanitized_filename.tar.gz" -${{ inputs.compress_level }} -C dloa "$filename" 
                   ;;
                 bzip2) 
                   tar -cvjf "$temp_dir/$sanitized_filename.tar.bz2" -${{ inputs.compress_level }} -C dloa "$filename" 
