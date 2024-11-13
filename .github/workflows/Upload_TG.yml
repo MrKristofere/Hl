@@ -115,17 +115,19 @@ jobs:
           rm -rf dloa
         continue-on-error: true
 
-      - name: Delete workflow run
-        if: always()
+      - name: Get Run ID
+        shell: bash
         run: |
-          set +x
-          run_id=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs?per_page=1" \
-            | jq -r ".workflow_runs[0].id")
+          run_id=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs?per_page=1" \
+              | jq -r ".workflow_runs[0].id")
+          echo "Run ID is $run_id"
+
+      - name: Delete Workflow Run
+        shell: bash
+        run: |
           curl -s -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs/$run_id"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/$run_id"
