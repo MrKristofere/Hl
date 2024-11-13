@@ -116,9 +116,12 @@ jobs:
           for file in dloa/*; do
             curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
               -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-              -F document=@"$file" \
-              -F "caption=Sending file: $file" \
-              --max-filesize 2048M > /dev/null 2>&1
+              -F document=@"$file" > /dev/null 2>&1
+  
+            if [ $? -ne 0 ]; then
+              echo "Ошибка при отправке файла $file"
+              exit 1
+            fi
           done
          
       - name: Upload to GitHub Release
