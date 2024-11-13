@@ -47,7 +47,7 @@ jobs:
           mkdir -p dloa
           IFS=$'\n'
     
-          echo "${{ inputs.upl }}" > dloa/urls.txt
+          echo "${{ inputs.upl }}" | tr ', ' '\n' > dloa/urls.txt
 
           prepare_url() {
             local url="$1"
