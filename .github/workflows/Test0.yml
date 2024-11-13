@@ -26,8 +26,8 @@ on:
       compress_level:
         description: 'Compression level (1-9)'
         required: false
-        type: number
-        default: 1
+        type: string
+        default: ''
       checksum:
         description: 'Enable CRC32 checksum verification'
         required: false
