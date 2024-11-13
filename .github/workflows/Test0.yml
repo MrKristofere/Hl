@@ -294,13 +294,15 @@ jobs:
 
               case "${{ inputs.compression }}" in
                 gzip) 
-                  tar -cvzf "$temp_dir/$sanitized_filename.tar.gz" -${{ inputs.compress_level }} -C dloa "$filename" 
+                  tar -cvf - "$file" | gzip -${{ inputs.compress_level }} > "$temp_dir/$sanitized_filename.tar.gz"
                   ;;
                 bzip2) 
-                  tar -cvjf "$temp_dir/$sanitized_filename.tar.bz2" -${{ inputs.compress_level }} -C dloa "$filename" 
+                  tar -cvf "$temp_dir/$sanitized_filename.tar" -C dloa "$filename"
+                  bzip2 -${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.tar"
                   ;;
                 xz) 
-                  tar -cvJf "$temp_dir/$sanitized_filename.tar.xz" --xz-compress-level=${{ inputs.compress_level }} -C dloa "$filename" 
+                  tar -cvf "$temp_dir/$sanitized_filename.tar" -C dloa "$filename"
+                  xz -${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.tar"
                   ;;
                rar)  
                   7z a -m0=rar -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.rar" "$file" 
