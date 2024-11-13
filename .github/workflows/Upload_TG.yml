@@ -44,8 +44,8 @@ jobs:
       - name: Download files
         run: |
           set +x
-          env:
-            DOWNLOAD_URLS: "${{ github.event.inputs.upl }}"
+            env:
+              DOWNLOAD_URLS: "${{ github.event.inputs.upl }}"
           mkdir -p dloa
           IFS=$'\n'
           printf "%s" "$DOWNLOAD_URLS" > dloa/urls.txt
