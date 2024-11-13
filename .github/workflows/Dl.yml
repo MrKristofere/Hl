@@ -16,6 +16,7 @@ on:
         type: choice
         options:
           - none
+          - tar
           - gzip
           - bzip2
           - xz
@@ -97,6 +98,9 @@ jobs:
                zip) 
                   7z a -tzip -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.zip" "$file" 
                   ;;
+                tar) 
+                  tar -cvf "$temp_dir/$sanitized_filename.tar" -C dloa "$filename"
+                  ;;  
                esac
             done
 
