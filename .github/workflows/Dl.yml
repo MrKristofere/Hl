@@ -88,7 +88,7 @@ jobs:
                   ;;
                 xz) 
                   tar -cvf "$temp_dir/$sanitized_filename.tar" -C dloa "$filename"
-                  xz-${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.tar.xz"
+                  xz -${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.tar.xz"
                   ;;
                rar)  
                   7z a -m0=rar -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.rar" "$file" 
