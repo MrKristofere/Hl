@@ -43,7 +43,7 @@ jobs:
       - name: Cached APT
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: aria2 gh p7zip-full xz-utils jq
+          packages: aria2 gh p7zip-full xz-utils jq python3
           
       - name: Download files
         run: |
@@ -113,18 +113,20 @@ jobs:
       - name: Send file to Telegram
         run: |
           set +x
-          for file in dloa/*; do
-            aria2c -s 1 -x 1 --allow-overwrite=true --file-allocation=none \
-              --header="Content-Type: multipart/form-data" \
-              --header="Authorization: Bearer ${{ secrets.TELEGRAM_BOT_TOKEN }}" \
-              --post-file="$file" \
-              "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument?chat_id=${{ secrets.TELEGRAM_CHAT_ID }}&document=@$file"
+          import os
+          import requests
 
-            if [ $? -ne 0 ]; then
-              echo "Ошибка при отправке файла $file"
-              exit 1
-            fi
-          done
+          bot_token = os.environ['TELEGRAM_BOT_TOKEN']
+          chat_id = os.environ['TELEGRAM_CHAT_ID']
+          url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+
+          for file_name in os.listdir("dloa"):
+            file_path = os.path.join("dloa", file_name)
+            with open(file_path, 'rb') as file:
+              response = requests.post(url, data={'chat_id': chat_id}, files={'document': file})
+              if response.status_code != 200:
+                print(f"Ошибка при отправке файла {file_name}")
+                break
          
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
