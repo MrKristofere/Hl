@@ -285,14 +285,22 @@ jobs:
         run: |
           echo "Compressing files..."
           if [ "${{ inputs.compression }}" != "none" ]; then
-            case "${{ inputs.compression }}" in
-              gzip) tar -cvzf "dloa_compressed.tar.gz" -C dloa . ;;
-              bzip2) tar -cvjf "dloa_compressed.tar.bz2" -C dloa . ;;
-              xz) tar -cvJf "dloa_compressed.tar.xz" -C dloa . ;;
-              rar) 7z a -m0=rar -mx${{ inputs.compress_level }} "dloa_compressed.rar" "dloa/*" ;; 
-              7z) 7z a -mx${{ inputs.compress_level }} "dloa_compressed.7z" "dloa/*" ;;
-              zip) 7z a -tzip -mx${{ inputs.compress_level }} "dloa_compressed.zip" "dloa/*" ;;
-            esac
+            for file in dloa/*; do
+              # Извлекаем имя файла без пути
+              filename=$(basename "$file")
+        
+              # Заменяем запрещённые символы (например, пробелы, двоеточия, слэши и т.д.) на "_"
+              sanitized_filename=$(echo "$filename" | sed 's/[^a-zA-Z0-9._-]/_/g')
+
+              case "${{ inputs.compression }}" in
+                gzip) tar -cvzf "${sanitized_filename}.tar.gz" -C dloa "$filename" ;;
+                bzip2) tar -cvjf "${sanitized_filename}.tar.bz2" -C dloa "$filename" ;;
+                xz) tar -cvJf "${sanitized_filename}.tar.xz" -C dloa "$filename" ;;
+                rar) 7z a -m0=rar -mx${{ inputs.compress_level }} "${sanitized_filename}.rar" "$file" ;;
+                7z) 7z a -mx${{ inputs.compress_level }} "${sanitized_filename}.7z" "$file" ;;
+                zip) 7z a -tzip -mx${{ inputs.compress_level }} "${sanitized_filename}.zip" "$file" ;;
+              esac
+            done
           else
             echo "No compression selected."
           fi
