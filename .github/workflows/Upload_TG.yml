@@ -42,12 +42,13 @@ jobs:
           packages: aria2 gh p7zip-full xz-utils jq
           
       - name: Download files
+        env:
+          DOWNLOAD_URLS: "${{ github.event.inputs.upl }}"
         run: |
           set +x
           mkdir -p dloa
           IFS=$'\n'
-    
-          echo "${{ github.event.inputs.upl }}" > dloa/urls.txt
+          printf "%s" "$DOWNLOAD_URLS" > dloa/urls.txt
 
           prepare_url() {
             local url="$1"
