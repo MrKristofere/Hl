@@ -17,6 +17,7 @@ on:
         type: choice
         options:
           - none
+          - tar
           - gzip
           - bzip2
           - xz
@@ -284,7 +285,6 @@ jobs:
       - name: File compression archive
         run: |
           echo "Compressing files..."
-          # Создаём временную папку для архивов
           temp_dir=$(mktemp -d)
 
           if [ "${{ inputs.compression }}" != "none" ]; then
@@ -294,13 +294,13 @@ jobs:
 
               case "${{ inputs.compression }}" in
                 gzip) 
-                  tar -cvzf "$temp_dir/$sanitized_filename.tar.gz" -C dloa "$filename" 
+                  tar -cvzf "$temp_dir/$sanitized_filename.tar.gz" -${{ inputs.compress_level }} -C dloa "$filename" 
                   ;;
                 bzip2) 
-                  tar -cvjf "$temp_dir/$sanitized_filename.tar.bz2" -C dloa "$filename" 
+                  tar -cvjf "$temp_dir/$sanitized_filename.tar.bz2" -${{ inputs.compress_level }} -C dloa "$filename" 
                   ;;
                 xz) 
-                  tar -cvJf "$temp_dir/$sanitized_filename.tar.xz" -C dloa "$filename" 
+                  tar -cvJf "$temp_dir/$sanitized_filename.tar.xz" --xz-compress-level=${{ inputs.compress_level }} -C dloa "$filename" 
                   ;;
                rar)  
                   7z a -m0=rar -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.rar" "$file" 
@@ -311,18 +311,18 @@ jobs:
                zip) 
                   7z a -tzip -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.zip" "$file" 
                   ;;
+                tar) 
+                  tar -cvf "$temp_dir/$sanitized_filename.tar" -C dloa "$filename"
+                  ;;  
                esac
             done
 
-            # Удаляем исходные файлы в папке dloa
             echo "Removing original files..."
             rm -rf dloa/*
 
-            # После сжатия перемещаем архивы в папку dloa
             echo "Moving compressed files to dloa..."
             mv "$temp_dir"/* dloa/
 
-            # Удаляем временную папку
             rmdir "$temp_dir"
       
           else
