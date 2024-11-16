@@ -1,0 +1,21 @@
+name: Delete Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag to delete'
+        required: true
+        default: ''
+
+jobs:
+  delete_tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Delete tag
+        run: |
+          git tag -d ${{ github.event.inputs.tag_name }}
+          git push origin :refs/tags/${{ github.event.inputs.tag_name }}
