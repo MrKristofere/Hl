@@ -54,11 +54,12 @@ jobs:
             if [[ ! "$url" =~ ^https?:// ]]; then
               url="https://$url"
             fi
+            echo "$url"
           }
 
           echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | while read -r url; do
             prepare_url "$url"
-          done | tr ' ' '\n' | xargs -P 4 -I {} bash -c 'aria2c -x 16 -s 16 -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true "$1" && exit 0' _ {}
+          done | xargs -P 4 -I {} bash -c 'aria2c -x 16 -s 16 -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true "{}" && exit 0'
       
       - name: Check files in dloa directory
         run: |
