@@ -54,11 +54,6 @@ jobs:
             if [[ ! "$url" =~ ^https?:// ]]; then
               url="https://$url"
             fi
-            urls_to_try=("$url")
-            if [[ ! "$url" =~ ^https?://www\. ]]; then
-          urls_to_try+=("${url/https:\/\//https://www.}")
-            fi
-            echo "${urls_to_try[@]}"
           }
 
           echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | while read -r url; do
