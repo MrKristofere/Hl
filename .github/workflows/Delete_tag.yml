@@ -8,14 +8,20 @@ on:
         required: true
         default: ''
 
+permissions:
+  contents: write
+
 jobs:
   delete_tag:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Delete tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
+          git fetch --tags
           git tag -d ${{ github.event.inputs.tag_name }}
           git push origin :refs/tags/${{ github.event.inputs.tag_name }}
