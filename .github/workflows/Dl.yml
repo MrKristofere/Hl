@@ -128,6 +128,10 @@ jobs:
       - name: Upload files to release
         run: |
           IFS=$'\n'
-          ls dloa/* | xargs -n 4 -P 4 -I {} gh release upload "${{ github.event.inputs.tag }}" "{}" --clobber
+          if [ "$(find dloa -type f | wc -l)" -gt 0 ]; then
+            find dloa -type f | xargs -n 4 -P 4 -I {} gh release upload "${{ github.event.inputs.tag }}" "{}" --clobber
+          else
+            echo "No files found in dloa directory."
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
