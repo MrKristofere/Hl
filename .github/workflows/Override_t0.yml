@@ -1,0 +1,296 @@
+name: override upl0
+
+on:
+  workflow_dispatch:
+    inputs:
+      upl:
+        description: 'Comma-separated URLs (or GitHub Release assets in the format "owner/repo@tag")'
+        required: true
+        type: string
+      tag:
+        description: 'Tag'
+        required: true
+        type: string
+      compression:
+        description: 'Compression method'
+        required: false
+        type: choice
+        options:
+          - none
+          - gzip
+          - bzip2
+          - xz
+          - rar
+          - 7z
+          - zip
+      compress_level:
+        description: 'Compression level (1-9)'
+        required: false
+        type: string
+        default: ''
+      checksum:
+        description: 'Enable CRC32 checksum verification'
+        required: false
+        type: boolean
+        default: true
+      extract:
+        description: 'Extract files for verification crc-32'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  id-token: write
+  actions: read
+
+jobs:
+  Upload_Files:
+    name: 'Upload Files'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ensure cache directories exist
+        run: |
+          mkdir -p ~/.cache/pip
+
+      - name: Cache apt dependencies
+        id: apt-cache
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: aria2 jq p7zip-full gzip bzip2 xz-utils parted genisoimage cdrtools tar arj cabextract python3 python3-pip
+
+      - name: Cache Python dependencies
+        id: pip-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/*') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        if: steps.pip-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "Installing pip dependencies..."
+          pip3 install crc32c
+          echo "Dependencies installed."
+
+      - name: Download files from URLs and GitHub Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p dloa
+          IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
+
+          download_urls=()
+
+          # Собираем все URL-адреса для параллельной загрузки
+          for url in "${urls[@]}"; do
+            if [[ "$url" =~ ^[^/]+/[^@]+@.+ ]]; then
+              # Скачивание из релиза GitHub, например "owner/repo@tag"
+              owner_repo="${url%@*}"
+              tag="${url##*@}"
+              api_url="https://api.github.com/repos/$owner_repo/releases/tags/$tag"
+
+              # Получение ссылки на артефакты
+              assets=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$api_url" | jq -r '.assets[] | .browser_download_url')
+
+              for asset_url in $assets; do
+                real_asset_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$asset_url")
+                download_urls+=("$real_asset_url")
+              done
+            else
+              # Для URL без прямых ссылок, используем wget или curl для обхода редиректов
+              real_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$url")
+
+              # Если это сайт, который генерирует ссылки через JavaScript, можно использовать wget или curl с флагами для обхода защиты
+              if [[ "$real_url" =~ ^https://example.com/.* ]]; then
+                # Пример для скачивания с сайта, где ссылка генерируется через JavaScript
+                wget --header="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" --max-redirect=10 --trust-server-names "$real_url" -P dloa
+              else
+                download_urls+=("$real_url")
+              fi
+            fi
+          done
+
+          # Создаём файл со списком прямых ссылок для aria2c
+          echo "Downloading files in parallel..."
+          printf "%s\n" "${download_urls[@]}" > urls.txt
+
+          # Загрузка файлов с помощью aria2c
+          aria2c -x 16 -s 16 -j 6 --continue=true -i urls.txt -d dloa
+
+      - name: Verify downloaded files
+        run: |
+          ls -lh dloa
+
+      - name: Verify CRC32 checksum
+        if: ${{ inputs.checksum == true }}
+        run: |
+          for file in dloa/*; do
+            crc32_value=$(python3 -c "import zlib; print(f'{zlib.crc32(open(\"$file\", \"rb\").read()):08x}')")
+            echo "File: $file, CRC32: $crc32_value"
+          done
+
+      - name: CRC32 Calculation for Files in Archives and Images
+        if: ${{ inputs.extract == true }}
+        run: |
+          echo "Checking files without extracting..."
+          for file in dloa/*; do
+            case $file in
+              *.tar.*)
+                echo "Contents of TAR archive: $file"
+                tar -tf "$file" | while read filename; do
+                  if [ -z "$filename" ]; then
+                    continue
+                  fi
+                  crc32_value=$(tar -xOf "$file" "$filename" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
+                  if [ "$crc32_value" != "00000000" ]; then
+                    echo "File: $filename, CRC32: $crc32_value"
+                  fi
+                done
+                ;;
+              *.zip)
+                echo "Contents of ZIP archive: $file"
+                unzip -l "$file" | awk 'NR>3 {print $4}' | while read filename; do
+                  if [ -z "$filename" ]; then
+                    continue
+                  fi
+                  crc32_value=$(unzip -p "$file" "$filename" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
+                  if [ "$crc32_value" != "00000000" ]; then
+                    echo "File: $filename, CRC32: $crc32_value"
+                  fi
+                done
+                ;;
+              *.rar)
+                echo "Contents of RAR archive: $file"
+                7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
+                  if [ -z "$filename" ]; then
+                    continue
+                  fi
+                  crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
+                  if [ "$crc32_value" != "00000000" ]; then
+                    echo "File: $filename, CRC32: $crc32_value"
+                  fi
+                done
+                ;;
+              *.7z)
+                echo "Contents of 7z archive: $file"
+                7z l "$file" | awk 'NR>1 {print $6}' | while read filename; do
+                  if [ -z "$filename" ]; then
+                    continue
+                  fi
+                  crc32_value=$(7z x -so "$file" "$filename" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
+                  if [ "$crc32_value" != "00000000" ]; then
+                    echo "File: $filename, CRC32: $crc32_value"
+                  fi
+                done
+                ;;
+              *.iso)
+                echo "Mounting ISO: $file"
+                mount_point=$(mktemp -d)
+                sudo mount -o loop "$file" "$mount_point"
+                find "$mount_point" -type f | while read filepath; do
+                  if [[ "$filepath" =~ /[.]/ ]]; then
+                    continue
+                  fi
+                  file_size=$(stat -c %s "$filepath")
+                  readable_size=$(numfmt --to=iec --suffix=B "$file_size")
+                  crc32_value=$(python3 -c "import zlib, sys; f = open('$filepath', 'rb'); print(f'{zlib.crc32(f.read()) & 0xffffffff:08x}')")
+                  echo "File: $filepath, Size: $readable_size ($file_size bytes), CRC32: $crc32_value"
+                done
+                sudo umount "$mount_point"
+                rmdir "$mount_point"
+                ;;
+              *.img)
+                echo "Checking IMG contents: $file"
+                mmls "$file" | awk '/\bUnallocated\b/ {next} {print $NF}' | while read partition; do
+                  fls -r -p "$file" "$partition" | while read filepath; do
+                    if [ -z "$filepath" ]; then
+                      continue
+                    fi
+                    echo "Extracting $filepath from IMG and calculating CRC32"
+                    crc32_value=$(icat "$file" "$filepath" | python3 -c "import zlib, sys; data=sys.stdin.buffer.read(); print(f'{zlib.crc32(data) & 0xffffffff:08x}')")
+                    if [ "$crc32_value" != "00000000" ]; then
+                      echo "File: $filepath, CRC32: $crc32_value"
+                    fi
+                  done
+                done
+                ;;
+              *)
+                echo "Unsupported file type: $file"
+                ;;
+            esac
+          done
+
+      - name: File compression archive
+        run: |
+          echo "Compressing files..."
+          temp_dir=$(mktemp -d)
+
+          if [ "${{ inputs.compression }}" != "none" ]; then
+            for file in dloa/*; do
+              filename=$(basename "$file")
+              sanitized_filename=$(echo "$filename" | sed 's/[^a-zA-Z0-9._-]/_/g')
+
+              case "${{ inputs.compression }}" in
+                gzip) 
+                  tar -cvf - "$file" | gzip -${{ inputs.compress_level }} > "$temp_dir/$sanitized_filename.tar.gz"
+                  ;;
+                bzip2) 
+                  tar -cvf "$temp_dir/$sanitized_filename.tar" -C dloa "$filename"
+                  bzip2 -${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.tar"
+                  ;;
+                xz) 
+                  tar -cvf "$temp_dir/$sanitized_filename.tar" -C dloa "$filename"
+                  xz -${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.tar"
+                  ;;
+               rar)  
+                  7z a -m0=rar -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.rar" "$file" 
+                  ;;
+               7z) 
+                  7z a -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.7z" "$file" 
+                  ;;
+               zip) 
+                  7z a -tzip -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.zip" "$file" 
+                  ;;
+                tar) 
+                  tar -cvf "$temp_dir/$sanitized_filename.tar" -C dloa "$filename"
+                  ;;  
+               esac
+            done
+
+            echo "Removing original files..."
+            rm -rf dloa/*
+
+            echo "Moving compressed files to dloa..."
+            mv "$temp_dir"/* dloa/
+
+            rmdir "$temp_dir"
+      
+          else
+            echo "No compression selected."
+          fi
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload files to release
+        run: |
+          IFS=$'\n'
+          if [ "$(find dloa -type f | wc -l)" -gt 0 ]; then
+            find dloa -type f -print0 | xargs -0 -n 4 -P 4 -I {} gh release upload "${{ github.event.inputs.tag }}" "{}" --clobber
+          else
+            echo "No files found in dloa directory."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Confirm Upload
+        run: |
+          echo "Files uploaded to GitHub Release."
