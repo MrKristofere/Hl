@@ -18,27 +18,42 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install aria2
+      - name: Install required tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y aria2
+          sudo apt-get install -y aria2 unzip unrar p7zip-full
 
       - name: Download file using aria2
         run: |
           aria2c -c -x 16 -s 16 -j 5 -o archive.zip ${{ github.event.inputs.file_url }} &
+          wait
 
-      - name: Extract ISO from archive
+      - name: Extract main archive
         run: |
           mkdir extracted
           if [[ ${{ github.event.inputs.file_url }} == *.zip ]]; then
             unzip archive.zip -d extracted
           elif [[ ${{ github.event.inputs.file_url }} == *.rar ]]; then
-            sudo apt-get install unrar
             unrar x archive.zip extracted/
           elif [[ ${{ github.event.inputs.file_url }} == *.7z ]]; then
-            sudo apt-get install p7zip-full
             7z x archive.zip -oextracted
           fi
+
+      - name: Handle multi-volume archives
+        run: |
+          # Check for any multi-volume archives in the extracted folder
+          for file in extracted/*; do
+            if [[ $file == *.part* ]]; then
+              echo "Found multi-volume archive: $file"
+              # Extract multi-volume RAR files
+              if [[ $file == *.rar ]]; then
+                unrar x "$file" extracted/
+              # Extract multi-volume 7z files
+              elif [[ $file == *.7z ]]; then
+                7z x "$file" -oextracted
+              fi
+            fi
+          done
 
       - name: Mount ISO
         run: |
