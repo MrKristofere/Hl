@@ -26,20 +26,20 @@ jobs:
           find . -name "*.iso"
 
       - name: Create Mount Point
-        run: mkdir -p /mnt/iso
+        run: mkdir -p ${{ github.workspace }}/mnt/iso
 
       - name: Mount ISO and Extract Files
         run: |
           # Mount the ISO file
-          fuseiso *.iso /mnt/iso
+          fuseiso *.iso ${{ github.workspace }}/mnt/iso
           echo "Mounted ISO contents:"
-          find /mnt/iso
+          find ${{ github.workspace }}/mnt/iso
 
           # Create a directory for extracted files
           mkdir -p extracted_files
 
           # Copy all files from the mounted ISO to extracted_files directory
-          cp /mnt/iso/* extracted_files/
+          cp ${{ github.workspace }}/mnt/iso/* extracted_files/
           echo "Extracted files before filtering:"
           find extracted_files
 
