@@ -61,6 +61,7 @@ jobs:
       - name: Filter and Process Files
         id: filter_files
         run: |
+          chmod -R 755 /home/runner/work/Hl/Hl/download/extracted_files
           echo "Filtering extracted files for .dll and .emu extensions"
 
           # Ensure directory exists
