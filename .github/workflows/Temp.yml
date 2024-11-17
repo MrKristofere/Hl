@@ -18,9 +18,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download file
+      - name: Install aria2
         run: |
-          curl -L --http2 -C - -o archive.zip ${{ github.event.inputs.file_url }} --connect-timeout 5 --max-time 300
+          sudo apt-get update
+          sudo apt-get install -y aria2
+
+      - name: Download file using aria2
+        run: |
+          aria2c -c -x 16 -s 16 -o archive.zip ${{ github.event.inputs.file_url }}
 
       - name: Extract ISO from archive
         run: |
