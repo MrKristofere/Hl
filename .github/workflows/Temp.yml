@@ -29,7 +29,7 @@ jobs:
           wait
 
       - name: Extract main archive
-        if: se=true
+        if: echo "se=true" >> GITHUB_ENV
         run: |
           mkdir extracted
           if [[ ${{ github.event.inputs.file_url }} == *.zip ]]; then
