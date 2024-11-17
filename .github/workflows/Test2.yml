@@ -86,7 +86,7 @@ jobs:
           echo "Downloading files..."
           IFS=',' read -r -a urls <<< "${{ inputs.upl }}"
           for url in "${urls[@]}"; do
-            aria2c -d dloa -x 16 -s 16 --continue=true --max-connection-per-server=4 --split=16 --min-split-size=1M "$url" &
+            aria2c --max-concurrent-downloads=5 --continue=true --max-connection-per-server=4 --split=16 --min-split-size=1M -d dloa "$url" &
           done
           wait
           echo "Files downloaded."
