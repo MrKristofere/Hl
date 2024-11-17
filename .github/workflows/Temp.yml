@@ -5,9 +5,6 @@ on:
       iso_url:
         description: 'URL of the ISO file to download'
         required: true
-      github_token:
-        description: 'GitHub token for authentication'
-        required: true
 
 permissions:
   contents: write  # Required for uploading files to GitHub Releases
@@ -39,6 +36,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
+            tag_name: "v32"
             extracted_files/*.dll
             extracted_files/*.emu
-          token: ${{ github.event.inputs.github_token }}
