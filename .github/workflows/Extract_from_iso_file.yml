@@ -82,7 +82,7 @@ jobs:
         id: filter_files
         run: |
           chmod -R 755 /home/runner/work/Hl/Hl/download/extracted_files
-          echo "Filtering extracted files for .dll and .emu extensions"
+          echo "Filtering extracted files extensions"
 
           # Ensure directory exists
           if [ ! -d "${{ github.workspace }}/download/extracted_files" ]; then
@@ -90,15 +90,15 @@ jobs:
             exit 1
           fi
 
-          # Find .dll and .emu files in all subdirectories and move them to the root of extracted_files
-          find "${{ github.workspace }}/download/extracted_files" -type f \( -name "*.dll" -o -name "*.emu" \) -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
+          find "${{ github.workspace }}/download/extracted_files" -type f \( -name "*.dll" -o -name "*.emu" -o -name "*.ini" \) -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
 
           # Check if files exist after moving
           DLL_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.dll")
           EMU_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.emu")
+          INI_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.ini")
 
-          if [ -z "$DLL_FILES" ] && [ -z "$EMU_FILES" ]; then
-            echo "No .dll or .emu files found."
+          if [ -z "$DLL_FILES" ] && [ -z "$EMU_FILES" ] && [ -Z "$INI_FILES" ]; then
+            echo "No .dll or .emu or .ini files found."
             echo "upload_files=false" >> $GITHUB_ENV
           else
             echo "DLL files found:"
@@ -106,6 +106,9 @@ jobs:
 
             echo "EMU files found:"
             echo "$EMU_FILES"
+
+            echo "INI files found:"
+            echo "$INI_FILES"
 
             echo "upload_files=true" >> $GITHUB_ENV
           fi
@@ -118,5 +121,6 @@ jobs:
           files: |
             ${{ github.workspace }}/download/extracted_files/*.dll
             ${{ github.workspace }}/download/extracted_files/*.emu
+            ${{ github.workspace }}/download/extracted_files/*.ini
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
