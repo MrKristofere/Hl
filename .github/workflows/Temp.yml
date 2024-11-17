@@ -59,6 +59,7 @@ jobs:
           find ${{ github.workspace }}/download/extracted_files
 
       - name: Filter and Process Files
+        id: filter_files
         run: |
           echo "Filtering extracted files for .dll and .emu extensions"
 
@@ -74,18 +75,20 @@ jobs:
 
           if [ -z "$DLL_FILES" ] && [ -z "$EMU_FILES" ]; then
             echo "No .dll or .emu files found."
-            exit 0
+            echo "upload_files=false" >> $GITHUB_ENV
+          else
+            echo "DLL files found:"
+            echo "$DLL_FILES"
+
+            echo "EMU files found:"
+            echo "$EMU_FILES"
+
+            echo "upload_files=true" >> $GITHUB_ENV
           fi
 
-          echo "DLL files found:"
-          echo "$DLL_FILES"
-
-          echo "EMU files found:"
-          echo "$EMU_FILES"
-
       - name: Upload to GitHub Releases
-        if: always()
-        uses: softprops/action-gh-release@v4
+        if: env.upload_files == 'true'
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: "v32"
           files: |
