@@ -59,7 +59,7 @@ jobs:
 
           echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | while read -r url; do
             prepare_url "$url"
-          done | xargs -P 4 -I {} bash -c 'aria2c -x 16 -s 16 -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true "{}" && exit 0'
+          done | xargs -P 4 -I {} bash -c 'aria2c --max-tries=5 --retry-wait=5 -x 16 -s 16 -d dloa --split=8 --max-connection-per-server=4 --min-split-size=5M --continue=true "{}" && exit 0'
       
       - name: Check files in dloa directory
         run: |
