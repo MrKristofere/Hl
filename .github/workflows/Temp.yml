@@ -25,7 +25,7 @@ jobs:
 
       - name: Download file using aria2
         run: |
-          aria2c -c -x 8 -s 8 -j 6 -o archive.zip ${{ github.event.inputs.file_url }} &
+          aria2c -c -x 16 -s 8 -j 6 -o archive.zip ${{ github.event.inputs.file_url }} &
           wait
 
       - name: Extract main archive
