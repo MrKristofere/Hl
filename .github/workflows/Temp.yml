@@ -20,7 +20,7 @@ jobs:
 
       - name: Download file
         run: |
-          curl -L -o archive.zip ${{ github.event.inputs.file_url }}
+          curl -L --http2 -C - -o archive.zip ${{ github.event.inputs.file_url }} --connect-timeout 5 --max-time 300
 
       - name: Extract ISO from archive
         run: |
