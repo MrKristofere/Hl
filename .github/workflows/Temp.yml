@@ -7,8 +7,8 @@ on:
         required: true
 
 permissions:
-  contents: write  # Required for uploading files to GitHub Releases
-  packages: write  # Optional, if you're using GitHub Packages
+  contents: write
+  packages: write
 
 jobs:
   download_and_extract:
@@ -24,26 +24,27 @@ jobs:
 
       - name: Download ISO
         run: |
-          aria2c "${{ github.event.inputs.iso_url }}" -d ${{ github.workspace }}/download
+          aria2c "${{ github.event.inputs.iso_url }}" -d ${{ github.workspace }}/download || { echo "Download failed"; exit 1; }
           echo "Downloaded ISO files:"
           find ${{ github.workspace }}/download -name "*.iso"
 
       - name: Verify Downloaded ISO
         run: |
-          if [ ! -f ${{ github.workspace }}/download/*.iso ]; then
+          ISO_FILE=$(find ${{ github.workspace }}/download -name "*.iso" -type f | head -n 1)
+          if [ -z "$ISO_FILE" ]; then
             echo "No ISO file found!"
             exit 1
           fi
-          echo "ISO file found:"
-          ls -lh ${{ github.workspace }}/download/*.iso
+          echo "ISO file found: $ISO_FILE"
 
       - name: Create Mount Point
         run: mkdir -p ${{ github.workspace }}/download/mnt/iso
 
       - name: Mount ISO and Extract Files
         run: |
-          # Attempt to mount the ISO file
-          if ! fuseiso ${{ github.workspace }}/download/*.iso ${{ github.workspace }}/download/mnt/iso; then
+          ISO_FILE=$(find ${{ github.workspace }}/download -name "*.iso" -type f | head -n 1)
+          trap 'fusermount -u ${{ github.workspace }}/download/mnt/iso' EXIT
+          if ! fuseiso "$ISO_FILE" ${{ github.workspace }}/download/mnt/iso; then
             echo "Failed to mount the ISO file."
             exit 1
           fi
@@ -51,23 +52,21 @@ jobs:
           echo "Mounted ISO contents:"
           find ${{ github.workspace }}/download/mnt/iso
 
-          # Create a directory for extracted files
           mkdir -p ${{ github.workspace }}/download/extracted_files
+          cp -r ${{ github.workspace }}/download/mnt/iso/* ${{ github.workspace }}/download/extracted_files/
 
-          # Copy all files from the mounted ISO to extracted_files directory
-          cp ${{ github.workspace }}/download/mnt/iso/* ${{ github.workspace }}/download/extracted_files/
           echo "Extracted files before filtering:"
           find ${{ github.workspace }}/download/extracted_files
 
-          # Extract only .dll and .emu files
-          7z e ${{ github.workspace }}/download/extracted_files/*.dll ${{ github.workspace }}/download/extracted_files/*.emu || true
+          find ${{ github.workspace }}/download/extracted_files -type f -name "*.dll" -o -name "*.emu" -exec 7z e {} -o${{ github.workspace }}/download/extracted_files/ \;
 
           echo "Extracted .dll and .emu files:"
           find ${{ github.workspace }}/download/extracted_files -name "*.dll"
           find ${{ github.workspace }}/download/extracted_files -name "*.emu"
 
       - name: Upload to GitHub Releases
-        uses: softprops/action-gh-release@v1
+        if: always()
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: "v32"
           files: |
