@@ -58,15 +58,34 @@ jobs:
           echo "Extracted files before filtering:"
           find ${{ github.workspace }}/download/extracted_files
 
-          find ${{ github.workspace }}/download/extracted_files -type f -name "*.dll" -o -name "*.emu" -exec 7z e {} -o${{ github.workspace }}/download/extracted_files/ \;
+      - name: Filter and Process Files
+        run: |
+          echo "Filtering extracted files for .dll and .emu extensions"
 
-          echo "Extracted .dll and .emu files:"
-          find ${{ github.workspace }}/download/extracted_files -name "*.dll"
-          find ${{ github.workspace }}/download/extracted_files -name "*.emu"
+          # Ensure directory exists
+          if [ ! -d "${{ github.workspace }}/download/extracted_files" ]; then
+            echo "Directory extracted_files does not exist."
+            exit 1
+          fi
+
+          # Find .dll and .emu files
+          DLL_FILES=$(find "${{ github.workspace }}/download/extracted_files" -type f -name "*.dll")
+          EMU_FILES=$(find "${{ github.workspace }}/download/extracted_files" -type f -name "*.emu")
+
+          if [ -z "$DLL_FILES" ] && [ -z "$EMU_FILES" ]; then
+            echo "No .dll or .emu files found."
+            exit 0
+          fi
+
+          echo "DLL files found:"
+          echo "$DLL_FILES"
+
+          echo "EMU files found:"
+          echo "$EMU_FILES"
 
       - name: Upload to GitHub Releases
         if: always()
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: "v32"
           files: |
