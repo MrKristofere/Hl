@@ -57,7 +57,7 @@ jobs:
             echo "$url"
           }
 
-          echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | while read -r url; do
+          echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | while IFS= read -r url; do
             prepared_url=$(prepare_url "$url")
             aria2c \
               --max-tries=5 \
