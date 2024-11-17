@@ -21,7 +21,7 @@ jobs:
       - name: Install required tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y aria2 unzip unrar p7zip-full
+          sudo apt-get install -y aria2 unzip unrar p7zip-full genisoimage mount udisks2
 
       - name: Download file using aria2
         run: |
