@@ -38,6 +38,7 @@ jobs:
           elif [[ ${{ github.event.inputs.file_url }} == *.7z ]]; then
             7z x archive.zip -oextracted
           fi
+          find -type f
 
       - name: Handle multi-volume archives
         run: |
@@ -54,12 +55,15 @@ jobs:
               fi
             fi
           done
+          find -type f
 
       - name: Mount ISO
         run: |
           sudo chmod 777 /mnt
           sudo mkdir -p /mnt/iso
           sudo mount -o loop extracted/*.iso /mnt/iso
+          find -type f
+          find /mnt/iso -type f
 
       - name: List files in ISO using find
         run: |
