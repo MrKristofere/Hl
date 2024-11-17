@@ -20,17 +20,35 @@ jobs:
           sudo apt-get install -y aria2 p7zip-full fuseiso
 
       - name: Download ISO
-        run: aria2c "${{ github.event.inputs.iso_url }}"
+        run: |
+          aria2c "${{ github.event.inputs.iso_url }}"
+          echo "Downloaded ISO files:"
+          find . -name "*.iso"
 
       - name: Create Mount Point
         run: mkdir -p /mnt/iso
 
       - name: Mount ISO and Extract Files
         run: |
+          # Mount the ISO file
           fuseiso *.iso /mnt/iso
+          echo "Mounted ISO contents:"
+          find /mnt/iso
+
+          # Create a directory for extracted files
           mkdir -p extracted_files
+
+          # Copy all files from the mounted ISO to extracted_files directory
           cp /mnt/iso/* extracted_files/
-          7z e extracted_files/*.dll extracted_files/*.emu
+          echo "Extracted files before filtering:"
+          find extracted_files
+
+          # Extract only .dll and .emu files
+          7z e extracted_files/*.dll extracted_files/*.emu || true
+
+          echo "Extracted .dll and .emu files:"
+          find extracted_files -name "*.dll"
+          find extracted_files -name "*.emu"
 
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v1
@@ -39,3 +57,5 @@ jobs:
           files: |
             extracted_files/*.dll
             extracted_files/*.emu
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
