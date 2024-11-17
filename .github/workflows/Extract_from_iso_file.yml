@@ -17,7 +17,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y aria2 p7zip-full fuseiso
+          sudo apt-get install -y aria2 p7zip-full fuseiso python3
 
       - name: Create Download Directory
         run: mkdir -p ${{ github.workspace }}/download
