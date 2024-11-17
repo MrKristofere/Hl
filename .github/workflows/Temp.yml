@@ -25,7 +25,7 @@ jobs:
 
       - name: Download file using aria2
         run: |
-          aria2c -c -x 16 -s 16 -j 5 -o archive.zip ${{ github.event.inputs.file_url }} &
+          aria2c -c -x 4 -s 8 -j 5 -o archive.zip ${{ github.event.inputs.file_url }} &
           wait
 
       - name: Extract main archive
@@ -57,7 +57,8 @@ jobs:
 
       - name: Mount ISO
         run: |
-          mkdir /mnt/iso
+          sudo chmod 777 /mnt
+          sudo mkdir -p /mnt/iso
           sudo mount -o loop extracted/*.iso /mnt/iso
 
       - name: List files in ISO using find
