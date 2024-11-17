@@ -19,43 +19,59 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y aria2 p7zip-full fuseiso
 
+      - name: Create Download Directory
+        run: mkdir -p ${{ github.workspace }}/download
+
       - name: Download ISO
         run: |
-          aria2c "${{ github.event.inputs.iso_url }}"
+          aria2c "${{ github.event.inputs.iso_url }}" -d ${{ github.workspace }}/download
           echo "Downloaded ISO files:"
-          find . -name "*.iso"
+          find ${{ github.workspace }}/download -name "*.iso"
+
+      - name: Verify Downloaded ISO
+        run: |
+          if [ ! -f ${{ github.workspace }}/download/*.iso ]; then
+            echo "No ISO file found!"
+            exit 1
+          fi
+          echo "ISO file found:"
+          ls -lh ${{ github.workspace }}/download/*.iso
 
       - name: Create Mount Point
-        run: mkdir -p ${{ github.workspace }}/mnt/iso
+        run: mkdir -p ${{ github.workspace }}/download/mnt/iso
 
       - name: Mount ISO and Extract Files
         run: |
-          # Mount the ISO file
-          fuseiso *.iso ${{ github.workspace }}/mnt/iso
+          # Attempt to mount the ISO file
+          if ! fuseiso ${{ github.workspace }}/download/*.iso ${{ github.workspace }}/download/mnt/iso; then
+            echo "Failed to mount the ISO file."
+            exit 1
+          fi
+
           echo "Mounted ISO contents:"
-          find ${{ github.workspace }}/mnt/iso
+          find ${{ github.workspace }}/download/mnt/iso
 
           # Create a directory for extracted files
-          mkdir -p extracted_files
+          mkdir -p ${{ github.workspace }}/download/extracted_files
 
           # Copy all files from the mounted ISO to extracted_files directory
-          cp ${{ github.workspace }}/mnt/iso/* extracted_files/
+          cp ${{ github.workspace }}/download/mnt/iso/* ${{ github.workspace }}/download/extracted_files/
           echo "Extracted files before filtering:"
-          find extracted_files
+          find ${{ github.workspace }}/download/extracted_files
 
           # Extract only .dll and .emu files
-          7z e extracted_files/*.dll extracted_files/*.emu || true
+          7z e ${{ github.workspace }}/download/extracted_files/*.dll ${{ github.workspace }}/download/extracted_files/*.emu || true
 
           echo "Extracted .dll and .emu files:"
-          find extracted_files -name "*.dll"
-          find extracted_files -name "*.emu"
+          find ${{ github.workspace }}/download/extracted_files -name "*.dll"
+          find ${{ github.workspace }}/download/extracted_files -name "*.emu"
 
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v1
         with:
           tag_name: "v32"
           files: |
-            extracted_files/*.dll
-            extracted_files/*.emu
+            ${{ github.workspace }}/download/extracted_files/*.dll
+            ${{ github.workspace }}/download/extracted_files/*.emu
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
