@@ -7,11 +7,17 @@ on:
         description: 'URL of the archive file (.zip, .rar, .7z)'
         required: true
 
+permissions:
+  contents: write  # Grant write permissions for creating releases
+
 jobs:
   download_and_process:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download file
         run: |
           curl -L -o archive.zip ${{ github.event.inputs.file_url }}
@@ -42,8 +48,12 @@ jobs:
         run: |
           find /mnt/iso -type f \( -name "*.dll" -o -name "*.emu" \) -exec cp {} ./extracted/ \;
 
-      - name: Upload to GitHub Releases
-        uses: actions/upload-release@v1
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          tag: 'v1.0.0'
+          tag_name: 'v1.0.0'  # Replace with dynamic versioning as needed
           files: './extracted/*'
+          body_path: CHANGELOG.md  # Optional, if you have a changelog file
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
