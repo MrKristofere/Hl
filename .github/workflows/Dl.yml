@@ -63,9 +63,7 @@ jobs:
               --max-tries=5 \
               --retry-wait=5 \
               --continue=true \
-              -x 16 \
-              -s 16 \
-              --max-concurrent-downloads=4 \
+              --max-concurrent-downloads=5 \
               --max-connection-per-server=4 \
               --split=8 \
              --min-split-size=5M \
