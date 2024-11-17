@@ -105,7 +105,7 @@ jobs:
               real_url=$(curl -Ls -o /dev/null -w '%{url_effective}' "$url")
 
               # Если это сайт, который генерирует ссылки через JavaScript, можно использовать wget или curl с флагами для обхода защиты
-              if [[ "$real_url" =~ ^https://example.com/.* ]]; then
+              if [[ "$real_url" =~ ^printf "%s\n" "${download_urls[@]}" ]]; then
                 # Пример для скачивания с сайта, где ссылка генерируется через JavaScript
                 wget --header="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" --max-redirect=10 --trust-server-names "$real_url" -P dloa
               else
@@ -119,7 +119,8 @@ jobs:
           printf "%s\n" "${download_urls[@]}" > urls.txt
 
           # Загрузка файлов с помощью aria2c
-          aria2c -x 16 -s 16 -j 6 --continue=true -i urls.txt -d dloa
+          aria2c -x 16 -s 16 -j 6 --continue=true -i urls.txt -d dloa &
+          wait
 
       - name: Verify downloaded files
         run: |
