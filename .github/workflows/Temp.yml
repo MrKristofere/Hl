@@ -69,9 +69,12 @@ jobs:
             exit 1
           fi
 
-          # Find .dll and .emu files
-          DLL_FILES=$(find "${{ github.workspace }}/download/extracted_files" -type f -name "*.dll")
-          EMU_FILES=$(find "${{ github.workspace }}/download/extracted_files" -type f -name "*.emu")
+          # Find .dll and .emu files and copy to root extracted_files
+          find "${{ github.workspace }}/download/extracted_files" -type f -name "*.dll" -o -name "*.emu" -exec cp {} "${{ github.workspace }}/download/extracted_files/" \;
+
+          # Check if files exist after copying
+          DLL_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.dll")
+          EMU_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.emu")
 
           if [ -z "$DLL_FILES" ] && [ -z "$EMU_FILES" ]; then
             echo "No .dll or .emu files found."
