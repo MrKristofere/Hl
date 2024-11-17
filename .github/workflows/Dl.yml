@@ -59,7 +59,18 @@ jobs:
 
           echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | while read -r url; do
             prepared_url=$(prepare_url "$url")
-            aria2c --max-tries=5 --retry-wait=5 --continue=true -x 16 -s 16 --max-concurrent-downloads=4 --max-connection-per-server=4 --split=8 --min-split-size=5M -d dloa "$prepared_url" &
+            aria2c \
+              --max-tries=5 \
+              --retry-wait=5 \
+              --continue=true \
+              -x 16 \
+              -s 16 \
+              --max-concurrent-downloads=4 \
+              --max-connection-per-server=4 \
+              --split=8 \
+             --min-split-size=5M \
+             -d dloa \
+             "$prepared_url" &
           done
 
           wait
