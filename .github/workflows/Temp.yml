@@ -29,6 +29,7 @@ jobs:
           wait
 
       - name: Extract main archive
+        if: se=true
         run: |
           mkdir extracted
           if [[ ${{ github.event.inputs.file_url }} == *.zip ]]; then
