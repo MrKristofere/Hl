@@ -1,0 +1,49 @@
+name: Download and Process Archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_url:
+        description: 'URL of the archive file (.zip, .rar, .7z)'
+        required: true
+
+jobs:
+  download_and_process:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download file
+        run: |
+          curl -L -o archive.zip ${{ github.event.inputs.file_url }}
+
+      - name: Extract ISO from archive
+        run: |
+          mkdir extracted
+          if [[ ${{ github.event.inputs.file_url }} == *.zip ]]; then
+            unzip archive.zip -d extracted
+          elif [[ ${{ github.event.inputs.file_url }} == *.rar ]]; then
+            sudo apt-get install unrar
+            unrar x archive.zip extracted/
+          elif [[ ${{ github.event.inputs.file_url }} == *.7z ]]; then
+            sudo apt-get install p7zip-full
+            7z x archive.zip -oextracted
+          fi
+
+      - name: Mount ISO
+        run: |
+          mkdir /mnt/iso
+          sudo mount -o loop extracted/*.iso /mnt/iso
+
+      - name: List files in ISO
+        run: |
+          ls /mnt/iso
+
+      - name: Extract DLL and EMU files
+        run: |
+          find /mnt/iso -type f \( -name "*.dll" -o -name "*.emu" \) -exec cp {} ./extracted/ \;
+
+      - name: Upload to GitHub Releases
+        uses: actions/upload-release@v1
+        with:
+          tag: 'v1.0.0'
+          files: './extracted/*'
