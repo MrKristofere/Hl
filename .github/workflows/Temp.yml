@@ -34,9 +34,9 @@ jobs:
           mkdir /mnt/iso
           sudo mount -o loop extracted/*.iso /mnt/iso
 
-      - name: List files in ISO
+      - name: List files in ISO using find
         run: |
-          ls /mnt/iso
+          find /mnt/iso -type f
 
       - name: Extract DLL and EMU files
         run: |
