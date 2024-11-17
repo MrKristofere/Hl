@@ -35,7 +35,7 @@ jobs:
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: "v32"
           files: |
-            tag_name: "v32"
             extracted_files/*.dll
             extracted_files/*.emu
