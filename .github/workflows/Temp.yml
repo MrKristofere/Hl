@@ -40,30 +40,12 @@ jobs:
           fi
           find -type f
 
-      - name: Handle multi-volume archives
-        run: |
-          # Check for any multi-volume archives in the extracted folder
-          for file in extracted/*; do
-            if [[ $file == *.part* ]]; then
-              echo "Found multi-volume archive: $file"
-              # Extract multi-volume RAR files
-              if [[ $file == *.rar ]]; then
-                unrar x "$file" extracted/
-              # Extract multi-volume 7z files
-              elif [[ $file == *.7z ]]; then
-                7z x "$file" -oextracted
-              fi
-            fi
-          done
-          find -type f
-
       - name: Mount ISO
         run: |
           sudo chmod 777 /mnt
           sudo mkdir -p /mnt/iso
           sudo mount -o loop extracted/*.iso /mnt/iso
           find -type f
-          find /mnt/iso -type f
 
       - name: List files in ISO using find
         run: |
