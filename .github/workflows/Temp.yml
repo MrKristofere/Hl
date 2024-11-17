@@ -25,27 +25,15 @@ jobs:
 
       - name: Download file using aria2
         run: |
-          aria2c -c -x 16 -s 8 -j 6 -o archive.zip ${{ github.event.inputs.file_url }} &
+          sudo mkdir -p d
+          aria2c -c -x 16 -s 8 -j 6 -o d ${{ github.event.inputs.file_url }} &
           wait
-
-      - name: Extract main archive
-        if: echo "se=true" >> GITHUB_ENV
-        run: |
-          mkdir extracted
-          if [[ ${{ github.event.inputs.file_url }} == *.zip ]]; then
-            unzip archive.zip -d extracted
-          elif [[ ${{ github.event.inputs.file_url }} == *.rar ]]; then
-            unrar x archive.zip extracted/
-          elif [[ ${{ github.event.inputs.file_url }} == *.7z ]]; then
-            7z x archive.zip -oextracted
-          fi
-          find -type f
 
       - name: Mount ISO
         run: |
           sudo chmod 777 /mnt
-          sudo mkdir -p /mnt/iso
-          sudo mount -o loop extracted/*.iso /mnt/iso
+          sudo mkdir -p d /mnt/iso
+          sudo mount -o loop d/*.iso /mnt/iso
           find -type f
 
       - name: List files in ISO using find
