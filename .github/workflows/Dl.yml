@@ -143,7 +143,7 @@ jobs:
         run: |
           IFS=$'\n'
           if [ "$(find dloa -type f | wc -l)" -gt 0 ]; then
-            find dloa -type f | xargs -n 4 -P 4 -I {} gh release upload "${{ github.event.inputs.tag }}" "{}" --clobber
+            find dloa -type f -print0 | xargs -0 -n 4 -P 4 -I {} gh release upload "${{ github.event.inputs.tag }}" "{}" --clobber
           else
             echo "No files found in dloa directory."
           fi
