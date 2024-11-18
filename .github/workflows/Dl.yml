@@ -69,9 +69,18 @@ jobs:
              --min-split-size=5M \
              -d dloa \
              "$prepared_url" &
-          done
+           pid=$!
 
-          wait
+           wait $pid
+
+           if [ $? -eq 0 ]; then
+             echo "Download succeeded: $prepared_url"
+           else
+             echo "Download failed: $prepared_url" >&2
+           fi
+           done
+
+           wait
       
       - name: Check files in dloa directory
         run: |
