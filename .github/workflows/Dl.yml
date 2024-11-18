@@ -156,7 +156,7 @@ jobs:
           else
             echo "No compression selected."
           fi
-          continue-on-error: true
+        continue-on-error: true
 
       - name: Create release
         uses: softprops/action-gh-release@v2
