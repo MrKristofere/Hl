@@ -48,39 +48,42 @@ jobs:
         run: |
           mkdir -p dloa
           IFS=$'\n'
+          pids=()
 
           prepare_url() {
-            local url="$1"
-            if [[ ! "$url" =~ ^https?:// ]]; then
-              url="https://$url"
-            fi
-            echo "$url"
+              local url="$1"
+              if [[ ! "$url" =~ ^https?:// ]]; then
+                  url="https://$url"
+              fi
+              echo "$url"
           }
 
           echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | while IFS= read -r url; do
-            prepared_url=$(prepare_url "$url")
-            aria2c \
-              --max-tries=5 \
-              --retry-wait=5 \
-              --continue=true \
-              --max-concurrent-downloads=5 \
-              --max-connection-per-server=4 \
-              --split=8 \
-             --min-split-size=5M \
-             -d dloa \
-             "$prepared_url" &
-           pid=$!
+              prepared_url=$(prepare_url "$url")
 
-           wait $pid
+              aria2c \
+                --max-tries=5 \
+                --retry-wait=5 \
+                --continue=true \
+                --max-concurrent-downloads=5 \
+                --max-connection-per-server=4 \
+                --split=8 \
+                --min-split-size=5M \
+                -d dloa \
+                "$prepared_url" &
+    
+              pids+=($!)
+          done
 
-           if [ $? -eq 0 ]; then
-             echo "Download succeeded: $prepared_url"
-           else
-             echo "Download failed: $prepared_url" >&2
-           fi
-           done
+          for pid in "${pids[@]}"; do
+              wait $pid
 
-           wait
+              if [ $? -eq 0 ]; then
+                  echo "Download succeeded for PID: $pid"
+              else
+                  echo "Download failed for PID: $pid" >&2
+              fi
+          done
       
       - name: Check files in dloa directory
         run: |
