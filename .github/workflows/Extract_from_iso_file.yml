@@ -36,27 +36,31 @@ jobs:
             exit 1
           fi
           echo "ISO file found: $ISO_FILE"
-          echo "ISO file found: $ISO_FILE"
-          
-          # Calculate CRC32 in hexadecimal format using Python
-          echo "Calculating CRC32 checksum for the ISO file..."
-          CRC32_CHECKSUM=$(python3 -c "
-          import zlib
-          import sys
 
-          with open('$ISO_FILE', 'rb') as f:
-              file_data = f.read()
-              crc32 = zlib.crc32(file_data) & 0xffffffff
-              print(hex(crc32)[2:].upper())
-          ")
+          CRC32_CHECKSUM=$(python3 - <<EOF
+          import zlib
+
+          def calculate_crc32(file_path):
+            crc32 = 0
+            with open(file_path, 'rb') as f:
+              while chunk := f.read(65536):
+                crc32 = zlib.crc32(chunk, crc32)
+              return crc32 & 0xffffffff
+
+          file_path = "$ISO_FILE"
+          print(hex(calculate_crc32(file_path))[2:].upper())
+          EOF
+          )
+
           echo "CRC32 checksum (hex): $CRC32_CHECKSUM"
 
           EXPECTED_CRC32="EXPECTED_CRC32_VALUE"
-            if [ "$CRC32_CHECKSUM" != "$EXPECTED_CRC32" ]; then
-              echo "CRC32 mismatch! Expected: $EXPECTED_CRC32, Got: $CRC32_CHECKSUM"
+          if [ "$CRC32_CHECKSUM" != "$EXPECTED_CRC32" ]; then
+            echo "CRC32 mismatch! Expected: $EXPECTED_CRC32, Got: $CRC32_CHECKSUM"
               exit 1
-            fi
+          fi
 
+          echo "CRC32 checksum verified successfully."
       - name: Create Mount Point
         run: mkdir -p ${{ github.workspace }}/download/mnt/iso
 
