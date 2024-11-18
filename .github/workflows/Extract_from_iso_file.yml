@@ -26,7 +26,11 @@ jobs:
         run: |
           aria2c "${{ github.event.inputs.iso_url }}" -d ${{ github.workspace }}/download || { echo "Download failed"; exit 1; }
           echo "Downloaded ISO files:"
-          find ${{ github.workspace }}/download
+          find ${{ github.workspace }}/download -type f | while read -r file; do
+            file_size_human=$(stat -c "%s" "$file")
+            file_size_readable=$(stat -c "%s" "$file" | numfmt --to=iec)
+            echo "$file $file_size_readable ($file_size_human bytes)"
+          done
 
       - name: Verify Downloaded ISO
         run: |
@@ -72,7 +76,23 @@ jobs:
           7z x "$ISO_FILE" -o"${{ github.workspace }}/download/extracted_files" -r -y "*.dll" "*.emu" "*.ini" || { echo "Failed to extract files."; exit 1; }
 
           echo "Extracted files:"
-          find ${{ github.workspace }}/download/extracted_files
+          find ${{ github.workspace }}/download/extracted_files -type f | while read -r file; do
+            file_size_human=$(stat -c "%s" "$file")
+            file_size_readable=$(stat -c "%s" "$file" | numfmt --to=iec)
+            echo "$file $file_size_readable ($file_size_human bytes)"
+          done
+
+      - name: Verify Extracted files
+        run: |
+          for file in ${{ github.workspace }}/download/extracted_files/*; do
+            crc32_value=$(python3 -c "
+          import zlib
+          with open('$file', 'rb') as f:
+              print(f'{zlib.crc32(f.read()):08X}')
+          ")
+            echo "File: $file, CRC32: $crc32_value"
+          done
+        continue-on-error: true
 
       - name: Filter and Process Files
         id: filter_files
