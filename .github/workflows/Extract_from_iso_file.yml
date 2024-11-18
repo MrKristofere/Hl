@@ -82,7 +82,7 @@ jobs:
 
           EXTENSIONS="*.dll *.ini"
           if [ "${{ github.event.inputs.extract_exe }}" == "true" ]; then
-            EXTENSIONS="$EXTENSIONS *.exe"
+            EXTENSIONS+=" *.exe"
           fi
 
           echo "Extracting files: $EXTENSIONS"
@@ -111,8 +111,7 @@ jobs:
         id: filter_files
         run: |
           chmod -R 755 ${{ github.workspace }}/download/extracted_files
-          echo "Filtering extracted files extensions"
-
+          
           if [ ! -d "${{ github.workspace }}/download/extracted_files" ]; then
             echo "Directory extracted_files does not exist."
             exit 1
@@ -124,29 +123,13 @@ jobs:
             find "${{ github.workspace }}/download/extracted_files" -type f -name "*.exe" -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
           fi
 
-          DLL_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.dll")
-          INI_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.ini")
-          EXE_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.exe")
+          FILES_FOUND=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 \( -name "*.dll" -o -name "*.ini" -o -name "*.exe" \))
 
-          if [ -z "$DLL_FILES" ] && [ -z "$INI_FILES" ] && [ -z "$EXE_FILES" ]; then
+          if [ -z "$FILES_FOUND" ]; then
             echo "No .dll, .ini or .exe files found."
             echo "upload_files=false" >> $GITHUB_ENV
           else
-            if [ ! -z "$DLL_FILES" ]; then
-              echo "DLL files found:"
-              echo "$DLL_FILES"
-            fi
-            
-            if [ ! -z "$INI_FILES" ]; then
-              echo "INI files found:"
-              echo "$INI_FILES"
-            fi
-            
-            if [ ! -z "$EXE_FILES" ]; then
-              echo "EXE files found:"
-              echo "$EXE_FILES"
-            fi
-
+            echo "$FILES_FOUND"
             echo "upload_files=true" >> $GITHUB_ENV
           fi
           
