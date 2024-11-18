@@ -54,7 +54,7 @@ jobs:
 
           # Просмотр содержимого ISO с помощью 7z
           echo "Listing contents of ISO file:"
-          7z l "$ISO_FILE" | grep -E "\.dll$|\.emu$|\.ini$" || { echo "Failed to list ISO contents."; exit 1; }
+          7z l "$ISO_FILE" || { echo "Failed to list ISO contents."; exit 1; }
 
       - name: Extract Specific Files from ISO
         run: |
