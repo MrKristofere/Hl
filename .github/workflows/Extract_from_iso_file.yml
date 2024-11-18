@@ -39,11 +39,11 @@ jobs:
             echo "File: $file, CRC32: $crc32_value"
           done
         continue-on-error: true
-          
+
       - name: Create Mount Point
         run: mkdir -p ${{ github.workspace }}/download/mnt/iso
 
-      - name: Mount ISO and Extract Files
+      - name: View ISO Contents
         run: |
           ISO_FILE=$(find ${{ github.workspace }}/download -name "*.iso" -type f | head -n 1)
           if [ -z "$ISO_FILE" ]; then
@@ -52,37 +52,48 @@ jobs:
           fi
           echo "ISO file found: $ISO_FILE"
 
-          7z x "$ISO_FILE" -o"${{ github.workspace }}/download/mnt/iso" || { echo "Failed to extract ISO."; exit 1; }
+          # Просмотр содержимого ISO с помощью 7z
+          echo "Listing contents of ISO file:"
+          7z l "$ISO_FILE" | grep -E "\.dll$|\.emu$|\.ini$" || { echo "Failed to list ISO contents."; exit 1; }
 
-          echo "Mounted ISO contents:"
-          find ${{ github.workspace }}/download/mnt/iso
+      - name: Extract Specific Files from ISO
+        run: |
+          ISO_FILE=$(find ${{ github.workspace }}/download -name "*.iso" -type f | head -n 1)
+          if [ -z "$ISO_FILE" ]; then
+            echo "No ISO file found!"
+            exit 1
+          fi
+          echo "ISO file found: $ISO_FILE"
 
+          # Создаем директорию для извлеченных файлов
           mkdir -p ${{ github.workspace }}/download/extracted_files
-          cp -r ${{ github.workspace }}/download/mnt/iso/* ${{ github.workspace }}/download/extracted_files/
 
-          echo "Extracted files before filtering:"
+          # Извлекаем только .dll, .emu и .ini файлы
+          7z x "$ISO_FILE" -o"${{ github.workspace }}/download/extracted_files" -r -y "*.dll" "*.emu" "*.ini" || { echo "Failed to extract files."; exit 1; }
+
+          echo "Extracted files:"
           find ${{ github.workspace }}/download/extracted_files
-          
+
       - name: Filter and Process Files
         id: filter_files
         run: |
-          chmod -R 755 /home/runner/work/${{ github.workspace }}/download/extracted_files
+          chmod -R 755 ${{ github.workspace }}/download/extracted_files
           echo "Filtering extracted files extensions"
 
-          # Ensure directory exists
           if [ ! -d "${{ github.workspace }}/download/extracted_files" ]; then
             echo "Directory extracted_files does not exist."
             exit 1
           fi
 
-          find "${{ github.workspace }}/download/extracted_files" -type f \( -name "*.dll" -o -name "*.emu" -o -name "*.ini" \) -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
+          # Перемещаем файлы с нужными расширениями в корень extracted_files
+          find "${{ github.workspace }}/download/extracted_files" -type f -name "*.dll" -o -name "*.emu" -o -name "*.ini" -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
 
-          # Check if files exist after moving
+          # Проверка наличия файлов после перемещения
           DLL_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.dll")
           EMU_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.emu")
           INI_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.ini")
 
-          if [ -z "$DLL_FILES" ] && [ -z "$EMU_FILES" ] && [ -Z "$INI_FILES" ]; then
+          if [ -z "$DLL_FILES" ] && [ -z "$EMU_FILES" ] && [ -z "$INI_FILES" ]; then
             echo "No .dll or .emu or .ini files found."
             echo "upload_files=false" >> $GITHUB_ENV
           else
