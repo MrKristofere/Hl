@@ -77,6 +77,8 @@ jobs:
                 --max-connection-per-server=4 \
                 --split=8 \
                 --min-split-size=5M \
+                --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6034.0 Safari/537.37" \
+                --follow-metalink=mem \
                 -d dloa \
                 "$prepared_url" &
 
