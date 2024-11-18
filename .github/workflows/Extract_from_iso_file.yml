@@ -65,7 +65,6 @@ jobs:
           fi
           echo "ISO file found: $ISO_FILE"
 
-          # Просмотр содержимого ISO с помощью 7z
           echo "Listing contents of ISO file:"
           7z l "$ISO_FILE" || { echo "Failed to list ISO contents."; exit 1; }
 
