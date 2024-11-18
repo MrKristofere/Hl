@@ -139,7 +139,7 @@ jobs:
                   7z a -m0=rar -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.rar" "$file" 
                   ;;
                7z) 
-                  7z a -m0=lzma2 -mx${{ inputs.compress_level }} -md=2g "$temp_dir/$sanitized_filename.7z" "$file" 
+                  /usr/bin/7z a -m0=lzma2 -mx${{ inputs.compress_level }} -md=2g "$temp_dir/$sanitized_filename.7z" "$file" 
                   ;;
                zip) 
                   7z a -tzip -mx${{ inputs.compress_level }} "$temp_dir/$sanitized_filename.zip" "$file" 
