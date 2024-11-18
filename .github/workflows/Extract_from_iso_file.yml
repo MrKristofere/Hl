@@ -98,12 +98,12 @@ jobs:
       - name: Verify Extracted files
         run: |
           find ${{ github.workspace }}/download/extracted_files -type f | while read -r file; do
-            crc32_value=$(python3 -c "
-              import zlib
-              with open('$file', 'rb') as f:
-                  print(f'{zlib.crc32(f.read()):08X}')
-            ")
-            echo "File: $file, CRC32: $crc32_value"
+              crc32_value=$(python3 -c "
+          import zlib
+          with open('$file', 'rb') as f:
+              print(f'{zlib.crc32(f.read()):08X}')
+             ")
+              echo "File: $file, CRC32: $crc32_value"
           done
         continue-on-error: true
 
