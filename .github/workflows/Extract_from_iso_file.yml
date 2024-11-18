@@ -5,6 +5,11 @@ on:
       iso_url:
         description: 'URL of the ISO file to download'
         required: true
+      tag:
+        description: 'Tag'
+        required: true
+        type: string
+        default: '32'
 
 permissions:
   contents: write
@@ -72,8 +77,8 @@ jobs:
           # Создаем директорию для извлеченных файлов
           mkdir -p ${{ github.workspace }}/download/extracted_files
 
-          # Извлекаем только .dll, .emu и .ini файлы
-          7z x "$ISO_FILE" -o"${{ github.workspace }}/download/extracted_files" -r -y "*.dll" "*.emu" "*.ini" || { echo "Failed to extract files."; exit 1; }
+          # Извлекаем только .dll и .ini файлы
+          7z x "$ISO_FILE" -o"${{ github.workspace }}/download/extracted_files" -r -y "*.dll" "*.ini" || { echo "Failed to extract files."; exit 1; }
 
           echo "Extracted files:"
           find ${{ github.workspace }}/download/extracted_files -type f | while read -r file; do
@@ -106,22 +111,18 @@ jobs:
           fi
 
           # Перемещаем файлы с нужными расширениями в корень extracted_files
-          find "${{ github.workspace }}/download/extracted_files" -type f \( -name "*.dll" -o -name "*.emu" -o -name "*.ini" \) -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
+          find "${{ github.workspace }}/download/extracted_files" -type f \( -name "*.dll" -o -name "*.ini" \) -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
 
           # Проверка наличия файлов после перемещения
           DLL_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.dll")
-          EMU_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.emu")
           INI_FILES=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 -type f -name "*.ini")
 
-          if [ -z "$DLL_FILES" ] && [ -z "$EMU_FILES" ] && [ -z "$INI_FILES" ]; then
-            echo "No .dll or .emu or .ini files found."
+          if [ -z "$DLL_FILES" ] && [ -z "$INI_FILES" ]; then
+            echo "No .dll or .ini files found."
             echo "upload_files=false" >> $GITHUB_ENV
           else
             echo "DLL files found:"
             echo "$DLL_FILES"
-
-            echo "EMU files found:"
-            echo "$EMU_FILES"
 
             echo "INI files found:"
             echo "$INI_FILES"
@@ -133,10 +134,9 @@ jobs:
         if: env.upload_files == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "v32"
+          tag_name: "${{ github.event.inputs.tag }}"
           files: |
             ${{ github.workspace }}/download/extracted_files/*.dll
-            ${{ github.workspace }}/download/extracted_files/*.emu
             ${{ github.workspace }}/download/extracted_files/*.ini
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
