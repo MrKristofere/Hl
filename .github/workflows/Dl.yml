@@ -42,7 +42,7 @@ jobs:
       - name: Cached APT
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: aria2 gh p7zip-full xz-utils
+          packages: aria2 gh 7zip xz-utils
         
       - name: Download files
         run: |
