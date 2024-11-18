@@ -43,22 +43,28 @@ jobs:
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
           packages: aria2 gh p7zip-full xz-utils
-          
+        
       - name: Download files
         run: |
           mkdir -p dloa
-          IFS=$'\n'
           pids=()
 
           prepare_url() {
               local url="$1"
+              url=$(echo "$url" | xargs)
               if [[ ! "$url" =~ ^https?:// ]]; then
                   url="https://$url"
               fi
               echo "$url"
           }
 
-          echo "${{ github.event.inputs.upl }}" | tr ',' '\n' | while IFS= read -r url; do
+          if [[ -z "${{ github.event.inputs.upl }}" ]]; then
+              echo "No URLs provided, exiting."
+              exit 1
+          fi
+
+          urls=$(echo "${{ github.event.inputs.upl }}" | tr ',' '\n')
+          for url in $urls; do
               prepared_url=$(prepare_url "$url")
 
               echo "Preparing to download: $prepared_url"
@@ -73,20 +79,24 @@ jobs:
                 --min-split-size=5M \
                 -d dloa \
                 "$prepared_url" &
-    
+
               pids+=($!)
           done
 
+          if [[ ${#pids[@]} -eq 0 ]]; then
+              echo "No downloads were started."
+              exit 1
+          fi
+
           for pid in "${pids[@]}"; do
               wait $pid
-
               if [ $? -eq 0 ]; then
                   echo "Download succeeded for PID: $pid"
               else
                   echo "Download failed for PID: $pid" >&2
               fi
-          done
-      
+          done     
+          
       - name: Check files in dloa directory
         run: |
           echo "Files in dloa directory:"
