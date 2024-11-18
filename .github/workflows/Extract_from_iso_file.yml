@@ -110,7 +110,7 @@ jobs:
       - name: Filter and Process Files
         id: filter_files
         run: |
-          chmod -R 755 ${{ github.workspace }}/download/extracted_files
+          chmod -R 755 ${{ github.workspace }}/download/extracted_files || { echo "Failed to change permissions."; exit 1; }
           
           if [ ! -d "${{ github.workspace }}/download/extracted_files" ]; then
             echo "Directory extracted_files does not exist."
