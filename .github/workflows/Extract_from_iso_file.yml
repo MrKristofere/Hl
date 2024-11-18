@@ -26,11 +26,11 @@ jobs:
         run: |
           aria2c "${{ github.event.inputs.iso_url }}" -d ${{ github.workspace }}/download || { echo "Download failed"; exit 1; }
           echo "Downloaded ISO files:"
-          find ${{ github.workspace }}/download -name "*.iso"
+          find ${{ github.workspace }}/download -f
 
       - name: Verify Downloaded ISO
         run: |
-          for file in /path/to/files/*; do
+          for file in ${{ github.workspace }}/download/*; do
             crc32_value=$(python3 -c "
           import zlib
           with open('$file', 'rb') as f:
@@ -66,7 +66,7 @@ jobs:
       - name: Filter and Process Files
         id: filter_files
         run: |
-          chmod -R 755 /home/runner/work/Hl/Hl/download/extracted_files
+          chmod -R 755 /home/runner/work/${{ github.workspace }}/download/extracted_files
           echo "Filtering extracted files extensions"
 
           # Ensure directory exists
