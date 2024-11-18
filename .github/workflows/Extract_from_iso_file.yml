@@ -133,6 +133,6 @@ jobs:
         with:
           tag_name: "${{ github.event.inputs.tag }}"
           files: |
-            ${{ github.workspace }}/download/extracted_files/*.{dll,ini,exe}
+            ${{ github.workspace }}/download/extracted_files/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
