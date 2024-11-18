@@ -42,11 +42,12 @@ jobs:
       - name: APT Update
         run: |
           sudo apt-get update
+          sudo apt-get install -y aria2 gh 7zip xz-utils
         
-      - name: Cached APT
-        uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: aria2 gh 7zip xz-utils
+#      - name: Cached APT
+#        uses: awalsh128/cache-apt-pkgs-action@v1
+#        with:
+#          packages: aria2 gh 7zip xz-utils
         
       - name: Download files
         run: |
