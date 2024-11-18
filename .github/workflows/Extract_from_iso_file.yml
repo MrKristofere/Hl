@@ -80,13 +80,13 @@ jobs:
 
           mkdir -p ${{ github.workspace }}/download/extracted_files
 
+          EXTENSIONS="*.dll *.ini"
           if [ "${{ github.event.inputs.extract_exe }}" == "true" ]; then
-            echo "Extracting .dll, .ini, and .exe files."
-            7z x "$ISO_FILE" -o"${{ github.workspace }}/download/extracted_files" -r -y "*.dll" "*.ini" "*.exe" || { echo "Failed to extract files."; exit 1; }
-          else
-            echo "Extracting only .dll and .ini files."
-            7z x "$ISO_FILE" -o"${{ github.workspace }}/download/extracted_files" -r -y "*.dll" "*.ini" || { echo "Failed to extract files."; exit 1; }
+            EXTENSIONS="$EXTENSIONS *.exe"
           fi
+
+          echo "Extracting files: $EXTENSIONS"
+          7z x "$ISO_FILE" -o"${{ github.workspace }}/download/extracted_files" -r -y $EXTENSIONS || { echo "Failed to extract files."; exit 1; }
 
           echo "Extracted files:"
           find ${{ github.workspace }}/download/extracted_files -type f | while read -r file; do
