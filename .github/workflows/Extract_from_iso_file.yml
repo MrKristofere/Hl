@@ -81,9 +81,7 @@ jobs:
           mkdir -p ${{ github.workspace }}/download/extracted_files
 
           EXTENSIONS="*.dll *.ini"
-          if [ "${{ github.event.inputs.extract_exe }}" == "true" ]; then
-            EXTENSIONS+=" *.exe"
-          fi
+          [ "${{ github.event.inputs.extract_exe }}" == "true" ] && EXTENSIONS+=" *.exe"
 
           echo "Extracting files: $EXTENSIONS"
           7z x "$ISO_FILE" -o"${{ github.workspace }}/download/extracted_files" -r -y $EXTENSIONS || { echo "Failed to extract files."; exit 1; }
@@ -91,7 +89,7 @@ jobs:
           echo "Extracted files:"
           find ${{ github.workspace }}/download/extracted_files -type f | while read -r file; do
             file_size_human=$(stat -c "%s" "$file")
-            file_size_readable=$(stat -c "%s" "$file" | numfmt --to=iec)
+            file_size_readable=$(numfmt --to=iec <<< "$file_size_human")
             echo "$file $file_size_readable ($file_size_human bytes)"
           done
 
@@ -123,14 +121,11 @@ jobs:
             find "${{ github.workspace }}/download/extracted_files" -type f -name "*.exe" -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
           fi
 
-          FILES_FOUND=$(find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 \( -name "*.dll" -o -name "*.ini" -o -name "*.exe" \))
-
-          if [ -z "$FILES_FOUND" ]; then
+          if find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 \( -name "*.dll" -o -name "*.ini" -o -name "*.exe" \) | grep .; then
+            echo "upload_files=true" >> $GITHUB_ENV
+          else
             echo "No .dll, .ini or .exe files found."
             echo "upload_files=false" >> $GITHUB_ENV
-          else
-            echo "$FILES_FOUND"
-            echo "upload_files=true" >> $GITHUB_ENV
           fi
           
       - name: Upload to GitHub Releases
