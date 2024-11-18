@@ -46,11 +46,13 @@ jobs:
       - name: Mount ISO and Extract Files
         run: |
           ISO_FILE=$(find ${{ github.workspace }}/download -name "*.iso" -type f | head -n 1)
-          trap 'fusermount -u ${{ github.workspace }}/download/mnt/iso' EXIT
-          if ! fuseiso "$ISO_FILE" ${{ github.workspace }}/download/mnt/iso; then
-            echo "Failed to mount the ISO file."
+          if [ -z "$ISO_FILE" ]; then
+            echo "No ISO file found!"
             exit 1
           fi
+          echo "ISO file found: $ISO_FILE"
+
+          7z x "$ISO_FILE" -o"${{ github.workspace }}/download/mnt/iso" || { echo "Failed to extract ISO."; exit 1; }
 
           echo "Mounted ISO contents:"
           find ${{ github.workspace }}/download/mnt/iso
@@ -60,7 +62,7 @@ jobs:
 
           echo "Extracted files before filtering:"
           find ${{ github.workspace }}/download/extracted_files
-
+          
       - name: Filter and Process Files
         id: filter_files
         run: |
