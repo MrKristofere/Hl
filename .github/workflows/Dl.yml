@@ -95,6 +95,7 @@ jobs:
             human_readable_size=$(numfmt --to=iec $size)
             echo "$filename $human_readable_size ($size bytes)"
           done
+        continue-on-error: true
           
       - name: File compression archive
         run: |
@@ -144,6 +145,7 @@ jobs:
           else
             echo "No compression selected."
           fi
+          continue-on-error: true
 
       - name: Create release
         uses: softprops/action-gh-release@v2
