@@ -103,32 +103,8 @@ jobs:
               echo "File: $file, CRC32: $crc32_value"
           done
         continue-on-error: true
-
-      - name: Filter and Process Files
-        id: filter_files
-        run: |
-          chmod -R 755 ${{ github.workspace }}/download/extracted_files || { echo "Failed to change permissions."; exit 1; }
-          
-          if [ ! -d "${{ github.workspace }}/download/extracted_files" ]; then
-            echo "Directory extracted_files does not exist."
-            exit 1
-          fi
-
-          find "${{ github.workspace }}/download/extracted_files" -type f \( -name "*.dll" -o -name "*.ini" \) -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
-
-          if [ "${{ github.event.inputs.extract_exe }}" == "true" ]; then
-            find "${{ github.workspace }}/download/extracted_files" -type f -name "*.exe" -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
-          fi
-
-          if find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 \( -name "*.dll" -o -name "*.ini" -o -name "*.exe" \) | grep .; then
-            echo "upload_files=true" >> $GITHUB_ENV
-          else
-            echo "No .dll, .ini or .exe files found."
-            echo "upload_files=false" >> $GITHUB_ENV
-          fi
           
       - name: Upload to GitHub Releases
-        if: env.upload_files == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "${{ github.event.inputs.tag }}"
