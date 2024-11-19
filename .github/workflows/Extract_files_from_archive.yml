@@ -80,8 +80,9 @@ jobs:
       - name: Create Extraction Directory
         run: mkdir -p ${{ github.workspace }}/download/extracted_files
 
-      - name: Extract Files from Archive
+      - name: Extract files from archive
         run: |
+          # Находим первый архивный файл в папке
           ARCHIVE_FILE=$(find "$GITHUB_WORKSPACE/download" -type f -print -quit)
           if [ -z "$ARCHIVE_FILE" ]; then
             echo "No archive file found!"
@@ -89,23 +90,47 @@ jobs:
           fi
           echo "Archive file found: $ARCHIVE_FILE"
 
-          EXTENSIONS="*.dll *.ini"
-          [ "${{ github.event.inputs.extract_exe }}" == "true" ] && EXTENSIONS+=" *.exe"
+          # Устанавливаем список расширений
+          EXTENSIONS=("*.dll" "*.ini")
+          if [ "${{ github.event.inputs.extract_exe }}" == "true" ]; then
+            EXTENSIONS+=("*.exe")
+          fi
+          echo "Extracting files with extensions: ${EXTENSIONS[*]}"
 
-          echo "Extracting files with extensions: $EXTENSIONS"
-          
+          # Создаём директорию для распакованных файлов
+          mkdir -p "$GITHUB_WORKSPACE/download/extracted_files"
+
+          # Определяем формат архива и выполняем распаковку
           case "${ARCHIVE_FILE##*.}" in
             zip)
-              unzip "$ARCHIVE_FILE" "$EXTENSIONS" -d "$GITHUB_WORKSPACE/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
+              for ext in "${EXTENSIONS[@]}"; do
+                unzip -j "$ARCHIVE_FILE" "$ext" -d "$GITHUB_WORKSPACE/download/extracted_files" || {
+                  echo "Failed to extract files for extension $ext."
+                  exit 1
+                }
+              done
               ;;
             tar.gz)
-              tar -xzf "$ARCHIVE_FILE" --wildcards --no-anchored "*.dll" "*.ini" "*.exe" -C "$GITHUB_WORKSPACE/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
+              tar -xzf "$ARCHIVE_FILE" -C "$GITHUB_WORKSPACE/download/extracted_files" --wildcards "${EXTENSIONS[@]}" || {
+                echo "Failed to extract files."
+                exit 1
+              }
               ;;
             rar)
-              unrar e "$ARCHIVE_FILE" "$EXTENSIONS" "$GITHUB_WORKSPACE/download/extracted_files/" || { echo "Failed to extract files."; exit 1; }
+              for ext in "${EXTENSIONS[@]}"; do
+                unrar e "$ARCHIVE_FILE" "$GITHUB_WORKSPACE/download/extracted_files/" "$ext" || {
+                  echo "Failed to extract files for extension $ext."
+                  exit 1
+                }
+              done
               ;;
             7z)
-              7z x "$ARCHIVE_FILE" -o"$GITHUB_WORKSPACE/download/extracted_files" -ir!"$EXTENSIONS" || { echo "Failed to extract files."; exit 1; }
+              for ext in "${EXTENSIONS[@]}"; do
+                7z x "$ARCHIVE_FILE" -o"$GITHUB_WORKSPACE/download/extracted_files" -ir!"$ext" || {
+                  echo "Failed to extract files for extension $ext."
+                  exit 1
+                }
+              done
               ;;
             *)
               echo "Unsupported archive format."
@@ -113,13 +138,18 @@ jobs:
               ;;
           esac
 
+          # Выводим список извлечённых файлов
           echo "Extracted files:"
           find "$GITHUB_WORKSPACE/download/extracted_files" -type f | while read -r file; do
             file_size_human=$(stat -c "%s" "$file")
-            file_size_readable=$(numfmt --to=iec <<< "$file_size_human")
+            if command -v numfmt >/dev/null; then
+              file_size_readable=$(numfmt --to=iec <<< "$file_size_human")
+            else
+              file_size_readable="${file_size_human} bytes"
+            fi
             echo "$file $file_size_readable ($file_size_human bytes)"
           done
-
+          
       - name: Verify Extracted Files
         run: |
           find "$GITHUB_WORKSPACE/download/extracted_files" -type f | while read -r file; do
