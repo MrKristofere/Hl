@@ -91,7 +91,6 @@ jobs:
             file_size_readable=$(numfmt --to=iec <<< "$file_size_human")
             echo "$file $file_size_readable ($file_size_human bytes)"
           done
-          find "${{ github.workspace }}/download/extracted_files" -type f -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
 
       - name: Verify Extracted files
         run: |
@@ -104,12 +103,16 @@ jobs:
               echo "File: $file, CRC32: $crc32_value"
           done
         continue-on-error: true
+
+      - name: Make Archive
+        run: |
+          7z a -mx=6 -mmt=on filebase.7z "${{ github.workspace }}/download/extracted_files"
           
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "${{ github.event.inputs.tag }}"
           files: |
-            ${{ github.workspace }}/download/extracted_files/*
+            ${{ github.workspace }}/download/extracted_files/*.7z
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
