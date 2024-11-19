@@ -107,6 +107,7 @@ jobs:
       - name: Make Archive
         run: |
           7z a -mx=6 -mmt=on filebase.7z "${{ github.workspace }}/download/extracted_files"
+          7z l filebase.7z
           
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v2
