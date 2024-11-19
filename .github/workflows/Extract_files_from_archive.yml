@@ -1,0 +1,136 @@
+name: Download and Extract Archive Files
+on:
+  workflow_dispatch:
+    inputs:
+      archive_url:
+        description: 'URL of the archive file to download'
+        required: true
+      tag:
+        description: 'Tag'
+        required: true
+        type: string
+        default: '32'
+      extract_exe:
+        description: 'Extract *.exe files?'
+        type: boolean
+        default: 'false'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  download_and_extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aria2 p7zip-full unzip python3
+
+      - name: Create Download Directory
+        run: mkdir -p ${{ github.workspace }}/download
+
+      - name: Download Archive
+        run: |
+          aria2c "${{ github.event.inputs.archive_url }}" -d ${{ github.workspace }}/download || { echo "Download failed"; exit 1; }
+          echo "Downloaded archive files:"
+          find ${{ github.workspace }}/download -type f | while read -r file; do
+            file_size_human=$(stat -c "%s" "$file")
+            file_size_readable=$(stat -c "%s" "$file" | numfmt --to=iec)
+            echo "$file $file_size_readable ($file_size_human bytes)"
+          done
+
+      - name: Verify Downloaded Archive
+        run: |
+          for file in ${{ github.workspace }}/download/*; do
+            crc32_value=$(python3 -c "
+          import zlib
+          with open('$file', 'rb') as f:
+              print(f'{zlib.crc32(f.read()):08X}')
+          ")
+            echo "File: $file, CRC32: $crc32_value"
+          done
+        continue-on-error: true
+
+      - name: Create Extraction Directory
+        run: mkdir -p ${{ github.workspace }}/download/extracted_files
+
+      - name: Extract Files from Archive
+        run: |
+          ARCHIVE_FILE=$(find ${{ github.workspace }}/download -type f | head -n 1)
+          if [ -z "$ARCHIVE_FILE" ]; then
+            echo "No archive file found!"
+            exit 1
+          fi
+          echo "Archive file found: $ARCHIVE_FILE"
+
+          EXTENSIONS="*.dll *.ini"
+          [ "${{ github.event.inputs.extract_exe }}" == "true" ] && EXTENSIONS+=" *.exe"
+
+          echo "Extracting files with extensions: $EXTENSIONS"
+          
+          case "${ARCHIVE_FILE##*.}" in
+            zip)
+              unzip "$ARCHIVE_FILE" "*.dll" "*.ini" "*.exe" -d "${{ github.workspace }}/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
+              ;;
+            tar.gz)
+              tar -xzf "$ARCHIVE_FILE" --wildcards --no-anchored '*.dll' '*.ini' '*.exe' -C "${{ github.workspace }}/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
+              ;;
+            *)
+              echo "Unsupported archive format."
+              exit 1
+              ;;
+          esac
+
+          echo "Extracted files:"
+          find ${{ github.workspace }}/download/extracted_files -type f | while read -r file; do
+            file_size_human=$(stat -c "%s" "$file")
+            file_size_readable=$(numfmt --to=iec <<< "$file_size_human")
+            echo "$file $file_size_readable ($file_size_human bytes)"
+          done
+
+      - name: Verify Extracted Files
+        run: |
+          find ${{ github.workspace }}/download/extracted_files -type f | while read -r file; do
+              crc32_value=$(python3 -c "
+          import zlib
+          with open('$file', 'rb') as f:
+              print(f'{zlib.crc32(f.read()):08X}')
+             ")
+              echo "File: $file, CRC32: $crc32_value"
+          done
+        continue-on-error: true
+
+      - name: Filter and Process Files
+        id: filter_files
+        run: |
+          chmod -R 755 ${{ github.workspace }}/download/extracted_files || { echo "Failed to change permissions."; exit 1; }
+          
+          if [ ! -d "${{ github.workspace }}/download/extracted_files" ]; then
+            echo "Directory extracted_files does not exist."
+            exit 1
+          fi
+
+          find "${{ github.workspace }}/download/extracted_files" -type f \( -name "*.dll" -o -name "*.ini" \) -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
+
+          if [ "${{ github.event.inputs.extract_exe }}" == "true" ]; then
+            find "${{ github.workspace }}/download/extracted_files" -type f -name "*.exe" -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
+          fi
+
+          if find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 \( -name "*.dll" -o -name "*.ini" -o -name "*.exe" \) | grep .; then
+            echo "upload_files=true" >> $GITHUB_ENV
+          else
+            echo "No .dll, .ini or .exe files found."
+            echo "upload_files=false" >> $GITHUB_ENV
+          fi
+
+      - name: Upload to GitHub Releases
+        if: env.upload_files == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "${{ github.event.inputs.tag }}"
+          files: |
+            ${{ github.workspace }}/download/extracted_files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
