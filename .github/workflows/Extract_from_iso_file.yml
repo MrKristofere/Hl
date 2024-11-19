@@ -106,7 +106,7 @@ jobs:
 
       - name: Make Archive
         run: |
-          7z a -mx=6 -mmt=on filebase.7z "${{ github.workspace }}/download/extracted_files"
+          7z a -mx=6 -mmt=on filebase.7z "${{ github.workspace }}/download/extracted_files/*"
           7z l filebase.7z
           
       - name: Upload to GitHub Releases
@@ -114,6 +114,6 @@ jobs:
         with:
           tag_name: "${{ github.event.inputs.tag }}"
           files: |
-            ${{ github.workspace }}/download/extracted_files/*.7z
+            ${{ github.workspace }}/download/extracted_files/filebase.7z
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
