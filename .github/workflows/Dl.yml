@@ -83,6 +83,7 @@ jobs:
                 --max-connection-per-server=4 \
                 --split=8 \
                 --min-split-size=5M \
+                --referer="https://www.google.com"
                 --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" \
                 -d dloa \
                 "$prepared_url" &
