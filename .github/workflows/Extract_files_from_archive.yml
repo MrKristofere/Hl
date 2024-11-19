@@ -26,7 +26,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y aria2 p7zip-full unzip python3 curl
+          sudo apt-get install -y aria2 p7zip-full p7zip-rar python3 curl
 
       - name: Create Download Directory
         run: mkdir -p ${{ github.workspace }}/download
