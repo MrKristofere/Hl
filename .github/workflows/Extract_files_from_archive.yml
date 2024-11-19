@@ -36,17 +36,27 @@ jobs:
           URL="${{ github.event.inputs.archive_url }}"
           EXPECTED_CONTENT_TYPES=("application/zip" "application/vnd.rar" "application/x-7z-compressed" "application/x-tar" "application/gzip" "application/x-xz")
 
-          # Проверка URL с помощью curl
-          CONTENT_TYPE=$(curl -s -o /dev/null -w "%{content_type}" "$URL")
-          
-          # Проверка, соответствует ли CONTENT_TYPE одному из ожидаемых типов
-          if [[ " ${EXPECTED_CONTENT_TYPES[@]} " =~ " ${CONTENT_TYPE} " ]]; then
-              echo "Содержимое корректное. Загружаем файл с помощью aria2..."
-              aria2c --max-tries=5 --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "$URL" -d ${{ github.workspace }}/download || { echo "Download failed"; exit 1; }
-          else
-              echo "Получено некорректное содержимое: $CONTENT_TYPE. Ошибка."
-              exit 1
-          fi
+          # Функция для загрузки файла с помощью aria2
+          download_file() {
+              aria2c --max-tries=5 --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "$1" -d ${{ github.workspace }}/download || { echo "Download failed"; exit 1; }
+          }
+
+          # Проверка URL с помощью curl и загрузка файла
+          for attempt in {1..2}; do
+              CONTENT_TYPE=$(curl -s -o /dev/null -w "%{content_type}" "$URL")
+              
+              if [[ " ${EXPECTED_CONTENT_TYPES[@]} " =~ " ${CONTENT_TYPE} " ]]; then
+                  echo "Содержимое корректное. Загружаем файл с помощью aria2..."
+                  download_file "$URL"
+                  break
+              else
+                  echo "Получено некорректное содержимое: $CONTENT_TYPE. Попытка $attempt из 2."
+                  if [ $attempt -eq 2 ]; then
+                      echo "Ошибка: файл не найден или получен HTML."
+                      exit 1
+                  fi
+              fi
+          done
 
           echo "Downloaded archive files:"
           find ${{ github.workspace }}/download -type f | while read -r file; do
