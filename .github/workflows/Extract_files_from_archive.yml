@@ -82,7 +82,7 @@ jobs:
 
       - name: Extract Files from Archive
         run: |
-          ARCHIVE_FILE=$(find ${{ github.workspace }}/download -type f | head -n 1)
+          ARCHIVE_FILE=$(find "$GITHUB_WORKSPACE/download" -type f -print -quit)
           if [ -z "$ARCHIVE_FILE" ]; then
             echo "No archive file found!"
             exit 1
@@ -96,17 +96,16 @@ jobs:
           
           case "${ARCHIVE_FILE##*.}" in
             zip)
-              unzip "$ARCHIVE_FILE" "$EXTENSIONS" -d "${{ github.workspace }}/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
+              unzip "$ARCHIVE_FILE" "$EXTENSIONS" -d "$GITHUB_WORKSPACE/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
               ;;
             tar.gz)
-              tar -xzf "$ARCHIVE_FILE" --wildcards --no-anchored "$EXTENSIONS" -C "${{ github.workspace }}/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
+              tar -xzf "$ARCHIVE_FILE" --wildcards --no-anchored "*.dll" "*.ini" "*.exe" -C "$GITHUB_WORKSPACE/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
               ;;
             rar)
-              unrar e "$ARCHIVE_FILE" "$EXTENSIONS" "${{ github.workspace }}/download/extracted_files/" || { echo "Failed to extract files."; exit 1; }
+              unrar e "$ARCHIVE_FILE" "$EXTENSIONS" "$GITHUB_WORKSPACE/download/extracted_files/" || { echo "Failed to extract files."; exit 1; }
               ;;
-            
             7z)
-              7z x "$ARCHIVE_FILE" -o"${{ github.workspace }}/download/extracted_files" -ir!"$EXTENSIONS" || { echo "Failed to extract files."; exit 1; }
+              7z x "$ARCHIVE_FILE" -o"$GITHUB_WORKSPACE/download/extracted_files" -ir!"$EXTENSIONS" || { echo "Failed to extract files."; exit 1; }
               ;;
             *)
               echo "Unsupported archive format."
@@ -115,7 +114,7 @@ jobs:
           esac
 
           echo "Extracted files:"
-          find ${{ github.workspace }}/download/extracted_files -type f | while read -r file; do
+          find "$GITHUB_WORKSPACE/download/extracted_files" -type f | while read -r file; do
             file_size_human=$(stat -c "%s" "$file")
             file_size_readable=$(numfmt --to=iec <<< "$file_size_human")
             echo "$file $file_size_readable ($file_size_human bytes)"
@@ -123,12 +122,12 @@ jobs:
 
       - name: Verify Extracted Files
         run: |
-          find ${{ github.workspace }}/download/extracted_files -type f | while read -r file; do
+          find "$GITHUB_WORKSPACE/download/extracted_files" -type f | while read -r file; do
               crc32_value=$(python3 -c "
           import zlib
           with open('$file', 'rb') as f:
               print(f'{zlib.crc32(f.read()):08X}')
-             ")
+              ")
               echo "File: $file, CRC32: $crc32_value"
           done
         continue-on-error: true
@@ -136,20 +135,16 @@ jobs:
       - name: Filter and Process Files
         id: filter_files
         run: |
-          chmod -R 755 ${{ github.workspace }}/download/extracted_files || { echo "Failed to change permissions."; exit 1; }
-          
-          if [ ! -d "${{ github.workspace }}/download/extracted_files" ]; then
-            echo "Directory extracted_files does not exist."
-            exit 1
-          fi
+          [ -d "$GITHUB_WORKSPACE/download/extracted_files" ] && chmod -R 755 "$GITHUB_WORKSPACE/download/extracted_files" || { echo "Directory does not exist."; exit 1; }
 
-          find "${{ github.workspace }}/download/extracted_files" -type f \( -name "*.dll" -o -name "*.ini" \) -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
+          find "$GITHUB_WORKSPACE/download/extracted_files" -type f \( -name "*.dll" -o -name "*.ini" \) | grep -q . && \
+          find "$GITHUB_WORKSPACE/download/extracted_files" -type f \( -name "*.dll" -o -name "*.ini" \) -exec mv {} "$GITHUB_WORKSPACE/download/extracted_files/" \;
 
           if [ "${{ github.event.inputs.extract_exe }}" == "true" ]; then
-            find "${{ github.workspace }}/download/extracted_files" -type f -name "*.exe" -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
+            find "$GITHUB_WORKSPACE/download/extracted_files" -type f -name "*.exe" -exec mv {} "$GITHUB_WORKSPACE/download/extracted_files/" \;
           fi
 
-          if find "${{ github.workspace }}/download/extracted_files" -maxdepth 1 \( -name "*.dll" -o -name "*.ini" -o -name "*.exe" \) | grep .; then
+          if find "$GITHUB_WORKSPACE/download/extracted_files" -maxdepth 1 \( -name "*.dll" -o -name "*.ini" -o -name "*.exe" \) | grep .; then
             echo "upload_files=true" >> $GITHUB_ENV
           else
             echo "No .dll, .ini or .exe files found."
