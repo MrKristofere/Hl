@@ -43,15 +43,15 @@ jobs:
 
           # Проверка URL с помощью curl и загрузка файла
           for attempt in {1..4}; do
-              CONTENT_TYPE=$(curl -s -o /dev/null -w "%{content_type}" "$URL")
-              
+              CONTENT_TYPE=$(curl -L -s -o /dev/null -w "%{content_type}" "$URL")
+    
               if [[ " ${EXPECTED_CONTENT_TYPES[@]} " =~ " ${CONTENT_TYPE} " ]]; then
                   echo "Содержимое корректное. Загружаем файл с помощью aria2..."
                   download_file "$URL"
                   break
               else
                   echo "Получено некорректное содержимое: $CONTENT_TYPE. Попытка $attempt из 4."
-                  if [ $attempt -eq 4 ]; then
+             if [ $attempt -eq 4 ]; then
                       echo "Ошибка: файл не найден или получен HTML."
                       exit 1
                   fi
