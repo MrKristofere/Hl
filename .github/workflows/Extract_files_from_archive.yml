@@ -89,6 +89,7 @@ jobs:
             exit 1
           fi
           echo "Archive file found: $ARCHIVE_FILE"
+          7z l "$ARCHIVE_FILE" || true
 
           # Устанавливаем список расширений
           EXTENSIONS=("*.dll" "*.ini")
@@ -125,7 +126,6 @@ jobs:
               done
               ;;
             7z)
-              7z l "$ARCHIVE_FILE"
               if 7z l "$ARCHIVE_FILE" | grep -q "$ext"; then
                 for ext in "${EXTENSIONS[@]}"; do
                   7z x "$ARCHIVE_FILE" -o"$GITHUB_WORKSPACE/download/extracted_files" -ir!"$ext" || {
