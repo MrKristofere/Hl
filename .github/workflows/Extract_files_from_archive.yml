@@ -26,14 +26,28 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y aria2 p7zip-full unzip python3
+          sudo apt-get install -y aria2 p7zip-full unzip python3 curl
 
       - name: Create Download Directory
         run: mkdir -p ${{ github.workspace }}/download
 
-      - name: Download Archive
+      - name: Check and Download Archive
         run: |
-          aria2c --max-tries=5 --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "${{ github.event.inputs.archive_url }}" -d ${{ github.workspace }}/download || { echo "Download failed"; exit 1; }
+          URL="${{ github.event.inputs.archive_url }}"
+          EXPECTED_CONTENT_TYPES=("application/zip" "application/vnd.rar" "application/x-7z-compressed" "application/x-tar" "application/gzip" "application/x-xz")
+
+          # Проверка URL с помощью curl
+          CONTENT_TYPE=$(curl -s -o /dev/null -w "%{content_type}" "$URL")
+          
+          # Проверка, соответствует ли CONTENT_TYPE одному из ожидаемых типов
+          if [[ " ${EXPECTED_CONTENT_TYPES[@]} " =~ " ${CONTENT_TYPE} " ]]; then
+              echo "Содержимое корректное. Загружаем файл с помощью aria2..."
+              aria2c --max-tries=5 --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "$URL" -d ${{ github.workspace }}/download || { echo "Download failed"; exit 1; }
+          else
+              echo "Получено некорректное содержимое: $CONTENT_TYPE. Ошибка."
+              exit 1
+          fi
+
           echo "Downloaded archive files:"
           find ${{ github.workspace }}/download -type f | while read -r file; do
             file_size_human=$(stat -c "%s" "$file")
