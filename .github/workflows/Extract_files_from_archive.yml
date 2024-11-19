@@ -125,17 +125,16 @@ jobs:
               done
               ;;
             7z)
-                if 7z l "$ARCHIVE_FILE" | grep -q "$ext"; then
-                  for ext in "${EXTENSIONS[@]}"; do
-                    7z x "$ARCHIVE_FILE" -o"$GITHUB_WORKSPACE/download/extracted_files" -ir!"$ext" || {
-                      echo "Failed to extract files for extension $ext."
-                      exit 1
-                    }
-                else
-                  echo "No matching files found in archive."
-                  exit 1;
-                fi
-              done
+              if 7z l "$ARCHIVE_FILE" | grep -q "$ext"; then
+                for ext in "${EXTENSIONS[@]}"; do
+                  7z x "$ARCHIVE_FILE" -o"$GITHUB_WORKSPACE/download/extracted_files" -ir!"$ext" || {
+                    echo "Failed to extract files for extension $ext."
+                    exit 1
+                  }
+              else
+                echo "No matching files found in archive."
+                exit 1;
+              fi
               ;;
             *)
               echo "Unsupported archive format."
