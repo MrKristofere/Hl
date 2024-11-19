@@ -91,7 +91,7 @@ jobs:
             file_size_readable=$(numfmt --to=iec <<< "$file_size_human")
             echo "$file $file_size_readable ($file_size_human bytes)"
           done
-          find "${{ github.workspace }}/download/extracted_files" -type f | -exec mv {} "${{ github.workspace }}/download/extracted_files/"
+          find "${{ github.workspace }}/download/extracted_files" -type f -exec mv {} "${{ github.workspace }}/download/extracted_files/" \;
 
       - name: Verify Extracted files
         run: |
