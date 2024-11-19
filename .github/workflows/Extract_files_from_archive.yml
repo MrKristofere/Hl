@@ -168,27 +168,7 @@ jobs:
           done
         continue-on-error: true
 
-      - name: Filter and Process Files
-        id: filter_files
-        run: |
-          [ -d "$GITHUB_WORKSPACE/download/extracted_files" ] && chmod -R 755 "$GITHUB_WORKSPACE/download/extracted_files" || { echo "Directory does not exist."; exit 1; }
-
-          find "$GITHUB_WORKSPACE/download/extracted_files" -type f \( -name "*.dll" -o -name "*.ini" \) | grep -q . && \
-          find "$GITHUB_WORKSPACE/download/extracted_files" -type f \( -name "*.dll" -o -name "*.ini" \) -exec mv {} "$GITHUB_WORKSPACE/download/extracted_files/" \;
-
-          if [ "${{ github.event.inputs.extract_exe }}" == "true" ]; then
-            find "$GITHUB_WORKSPACE/download/extracted_files" -type f -name "*.exe" -exec mv {} "$GITHUB_WORKSPACE/download/extracted_files/" \;
-          fi
-
-          if find "$GITHUB_WORKSPACE/download/extracted_files" -maxdepth 1 \( -name "*.dll" -o -name "*.ini" -o -name "*.exe" \) | grep .; then
-            echo "upload_files=true" >> $GITHUB_ENV
-          else
-            echo "No .dll, .ini or .exe files found."
-            echo "upload_files=false" >> $GITHUB_ENV
-          fi
-
       - name: Upload to GitHub Releases
-        if: env.upload_files == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "${{ github.event.inputs.tag }}"
