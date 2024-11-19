@@ -131,6 +131,7 @@ jobs:
                     echo "Failed to extract files for extension $ext."
                     exit 1
                   }
+                done
               else
                 echo "No matching files found in archive."
                 exit 1;
