@@ -96,16 +96,17 @@ jobs:
           
           case "${ARCHIVE_FILE##*.}" in
             zip)
-              unzip "$ARCHIVE_FILE" "*.dll" "*.ini" "*.exe" -d "${{ github.workspace }}/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
+              unzip "$ARCHIVE_FILE" "$EXTENSIONS" -d "${{ github.workspace }}/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
               ;;
             tar.gz)
-              tar -xzf "$ARCHIVE_FILE" --wildcards --no-anchored '*.dll' '*.ini' '*.exe' -C "${{ github.workspace }}/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
+              tar -xzf "$ARCHIVE_FILE" --wildcards --no-anchored "$EXTENSIONS" -C "${{ github.workspace }}/download/extracted_files" || { echo "Failed to extract files."; exit 1; }
               ;;
             rar)
-              unrar e "$ARCHIVE_FILE" "*.dll" "*.ini" "*.exe" "${{ github.workspace }}/download/extracted_files/" || { echo "Failed to extract files."; exit 1; }
+              unrar e "$ARCHIVE_FILE" "$EXTENSIONS" "${{ github.workspace }}/download/extracted_files/" || { echo "Failed to extract files."; exit 1; }
               ;;
+            
             7z)
-              7z x "$ARCHIVE_FILE" -o"${{ github.workspace }}/download/extracted_files" $EXTENSIONS || { echo "Failed to extract files."; exit 1; }
+              7z x "$ARCHIVE_FILE" -o"${{ github.workspace }}/download/extracted_files" -ir!"$EXTENSIONS" || { echo "Failed to extract files."; exit 1; }
               ;;
             *)
               echo "Unsupported archive format."
