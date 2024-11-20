@@ -40,7 +40,10 @@ jobs:
               aria2c --max-tries=5 --referer="https://www.google.com" --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "$1" -d download || { echo "Download failed"; exit 1; }
           }
 
-          if [[ "$INPUT" =~ ^[a-fA-F0-9]{40}$ ]]; then
+          if [[ "$INPUT" =~ ^magnet: ]]; then
+              echo "Загружаем торрент по magnet-ссылке: $INPUT"
+              download_file "$INPUT"
+          elif [[ "$INPUT" =~ ^[a-fA-F0-9]{40}$ ]]; then
               MAGNET_URL="magnet:?xt=urn:btih:${INPUT}"
               echo "Загружаем торрент по хешу: $INPUT"
               download_file "$MAGNET_URL"
