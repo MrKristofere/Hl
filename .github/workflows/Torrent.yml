@@ -6,15 +6,20 @@ on:
       torrent_url:
         description: 'URL или путь к торрент файлу или магнет-ссылка'
         required: true
-        default: ''  # Можете указать значение по умолчанию, если хотите
+        default: ''
 
 jobs:
   download_torrent:
-    runs-on: ubuntu-latest  # Используем Ubuntu
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
+
+    - name: Создание директории и настройка прав доступа для aria2 cache
+      run: |
+        mkdir -p /home/runner/.cache/aria2  # Создание каталога для кеша aria2
+        chmod 777 /home/runner/.cache/aria2  # Установка прав на запись для кеша
 
     - name: Установка aria2
       run: |
@@ -23,7 +28,14 @@ jobs:
 
     - name: Скачивание торрент файла или магнет-ссылки
       run: |
-        # Указываем путь к скрипту
         chmod +x ./download_torrent.sh
-        # Запускаем скрипт с передачей ссылки, полученной через inputs
         ./download_torrent.sh "${{ github.event.inputs.torrent_url }}"
+
+    - name: Upload to GitHub Releases
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: "${{ github.event.inputs.tag }}"
+        files: |
+          download/extracted_files/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
