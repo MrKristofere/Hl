@@ -106,7 +106,7 @@ jobs:
 
       - name: Make Archive
         run: |
-          cd download/extracted_files && 7z a -mx=6 -mmt=on "download/extracted_files/extras/filebase.7z" *
+          cd download/extracted_files && 7z a -mx=6 -mmt=on "extras/filebase.7z" *
           cd -
           7z l "download/extracted_files/extras/filebase.7z" || true
           find || true
