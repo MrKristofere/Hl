@@ -7,8 +7,7 @@ download_torrent_file() {
 
     if [ -f "$torrent_file" ]; then
         echo "Начинаем загрузку с файла: $torrent_file..."
-        aria2c -d "$output_dir" "$torrent_file"
-        echo "$output_dir"
+        aria2c -d "$output_dir" "$torrent_file" || { echo "Ошибка загрузки файла!"; exit 1; }
     else
         echo "Файл $torrent_file не найден!"
         exit 1
@@ -22,8 +21,7 @@ download_magnet_link() {
 
     if [ -n "$magnet_link" ]; then
         echo "Начинаем загрузку с магнет-ссылки: $magnet_link..."
-        aria2c -d "$output_dir" "$magnet_link"
-        echo "$output_dir"
+        aria2c -d "$output_dir" --out "downloaded_file" "$magnet_link" || { echo "Ошибка загрузки файла!"; exit 1; }
     else
         echo "Магнет-ссылка не предоставлена!"
         exit 1
@@ -47,19 +45,20 @@ main() {
     mkdir -p "$output_dir"
 
     # Проверка, является ли переданная ссылка магнет-ссылкой
-    local downloaded_path=""
+    local downloaded_file=""
     if [[ "$torrent_url" =~ ^magnet: ]]; then
-        downloaded_path=$(download_magnet_link "$torrent_url" "$output_dir")
+        download_magnet_link "$torrent_url" "$output_dir"
+        downloaded_file="$output_dir/downloaded_file"
     elif [[ -f "$torrent_url" ]]; then
-        downloaded_path=$(download_torrent_file "$torrent_url" "$output_dir")
+        download_torrent_file "$torrent_url" "$output_dir"
+        downloaded_file=$(find "$output_dir" -type f | head -n 1)
     else
         echo "Неверная ссылка или файл не существует!"
         exit 1
     fi
 
-    # Определение скачанного файла
-    local downloaded_file=$(find "$downloaded_path" -type f | head -n 1)
-    if [ -z "$downloaded_file" ]; then
+    # Проверка существования файла
+    if [ ! -f "$downloaded_file" ]; then
         echo "Ошибка: файл не найден после загрузки!"
         exit 1
     fi
@@ -67,12 +66,8 @@ main() {
     echo "Скачанный файл: $downloaded_file"
 
     # Запуск следующего скрипта с передачей пути к файлу
-    if [ -x "$file_processing" ]; then
-        "$file_processing" "$downloaded_file"
-    else
-        echo "Следующий скрипт ($file_processing) не найден или не является исполняемым!"
-        exit 1
-    fi
+    chmod +x "$file_processing"
+    "$file_processing" "$downloaded_file"
 }
 
 # Запуск главной функции
