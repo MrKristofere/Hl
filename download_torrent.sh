@@ -74,14 +74,31 @@ download_torrent_by_hash() {
     fi
 }
 
+# Обработка INPUT
+process_input() {
+    local input="$1"
+    local output_dir="$2"
+
+    if [[ "$input" =~ ^magnet: ]]; then
+        echo "Загружаем торрент по magnet-ссылке: $input"
+        download_magnet_link "$input" "$output_dir"
+    elif [[ "$input" =~ ^[a-fA-F0-9]{40}$ ]]; then
+        MAGNET_URL="magnet:?xt=urn:btih:${input}"
+        echo "Загружаем торрент по хешу: $input"
+        download_torrent_by_hash "$input" "$output_dir"
+    else
+        echo "Получено некорректное содержимое: $input."
+        exit 1
+    fi
+}
+
 # Главная функция
 main() {
     local output_dir="$GITHUB_WORKSPACE/Downloads"
-    local torrent_url="$1"
-    local torrent_hash="$2"
+    local input="$1"
     local file_processing="./file_processing.sh"
 
-    if [ -z "$torrent_url" ] && [ -z "$torrent_hash" ]; then
+    if [ -z "$input" ]; then
         echo "Не указана ссылка или хеш для скачивания!"
         exit 1
     fi
@@ -93,17 +110,8 @@ main() {
 
     mkdir -p "$output_dir"
 
-    # Скачиваем через магнет-ссылку или файл торрента
-    if [[ "$torrent_url" =~ ^magnet: ]]; then
-        download_magnet_link "$torrent_url" "$output_dir"
-    elif [[ -f "$torrent_url" ]]; then
-        download_torrent_file "$torrent_url" "$output_dir"
-    fi
-
-    # Если указан хеш, скачиваем через хеш
-    if [ -n "$torrent_hash" ]; then
-        download_torrent_by_hash "$torrent_hash" "$output_dir"
-    fi
+    # Обработка входного параметра
+    process_input "$input" "$output_dir"
 
     # Проверка наличия загруженного файла
     if [ -z "$downloaded_file" ] || [ ! -f "$downloaded_file" ]; then
