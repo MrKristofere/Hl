@@ -33,7 +33,6 @@ download_magnet_link() {
           --dht-entry-point=dht.libtorrent.org:25401 \
           --seed-time=0 \
           --continue=true \
-          --dht-file-path="~/.cache/aria2/dht.dat" \
           "$magnet_link" || { echo "Ошибка загрузки файла!"; exit 1; }
     else
         echo "Магнет-ссылка не предоставлена!"
