@@ -16,7 +16,11 @@ download_torrent_file() {
 
     if [ -f "$torrent_file" ]; then
         echo "Начинаем загрузку с файла: $torrent_file..."
-        aria2c -d "$output_dir" "$torrent_file" || { echo "Ошибка загрузки файла $torrent_file!"; exit 1; }
+        
+        aria2c \
+            -d "$output_dir" \
+            "$torrent_file" || { echo "Ошибка загрузки файла $torrent_file!"; exit 1; }
+        
         downloaded_file="$output_dir/$(basename "$torrent_file" .torrent)"
     else
         echo "Файл $torrent_file не найден!"
@@ -31,13 +35,16 @@ download_magnet_link() {
 
     if [ -n "$magnet_link" ]; then
         echo "Начинаем загрузку с магнет-ссылки: $magnet_link..."
-        downloaded_file="$output_dir/$(basename "$magnet_link" | cut -d'?' -f1)"
+        
         aria2c \
-          -d "$output_dir" \
-          --enable-dht=true \
-          --seed-time=0 \
-          --continue=true \
-          --out "$(basename "$downloaded_file")" "$magnet_link" || { echo "Ошибка загрузки файла с магнет-ссылки!"; exit 1; }
+            -d "$output_dir" \
+            --enable-dht=true \
+            --seed-time=0 \
+            --continue=true \
+            --out "$(basename "$magnet_link" | cut -d'?' -f1)" \
+            "$magnet_link" || { echo "Ошибка загрузки файла с магнет-ссылки!"; exit 1; }
+        
+        downloaded_file="$output_dir/$(basename "$magnet_link" | cut -d'?' -f1)"
     else
         echo "Магнет-ссылка не предоставлена!"
         exit 1
@@ -50,7 +57,7 @@ download_torrent_by_hash() {
     local output_dir=$2
 
     if [ -n "$torrent_hash" ]; then
-        echo "Начинаем загрузку с хеша торрента: $torrent_hash..."
+        echo "Конвертируем хеш торрента в магнет-ссылку..."
         magnet_link="magnet:?xt=urn:btih:$torrent_hash"
         download_magnet_link "$magnet_link" "$output_dir"
     else
@@ -73,17 +80,19 @@ main() {
 
     mkdir -p "$output_dir"
 
+    # Скачиваем через магнет-ссылку или файл торрента
     if [[ "$torrent_url" =~ ^magnet: ]]; then
         download_magnet_link "$torrent_url" "$output_dir"
     elif [[ -f "$torrent_url" ]]; then
         download_torrent_file "$torrent_url" "$output_dir"
-    elif [[ -n "$torrent_hash" ]]; then
-        download_torrent_by_hash "$torrent_hash" "$output_dir"
-    else
-        echo "Неверная ссылка или файл не существует!"
-        exit 1
     fi
 
+    # Если указан хеш, скачиваем через хеш
+    if [ -n "$torrent_hash" ]; then
+        download_torrent_by_hash "$torrent_hash" "$output_dir"
+    fi
+
+    # Проверка наличия загруженного файла
     if [ ! -f "$downloaded_file" ]; then
         echo "Ошибка: файл не найден после загрузки!"
         exit 1
