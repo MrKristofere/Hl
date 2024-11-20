@@ -18,7 +18,6 @@ aria2c \
   --dir="$DOWNLOAD_DIR" \
   --enable-dht \
   --dht-file-path="$HOME/.cache/aria2/dht.dat" \
-  --dht-file-path="$HOME/.cache/aria2/dht.dat" \
   --bt-save-metadata=true \
   --seed-time=0 \
   --summary-interval=0 \
