@@ -16,6 +16,8 @@ download_torrent_file() {
 }
 
 create_dht_dat() {
+    mkdir -p $HOME/.cache/aria2
+    chmod 755 $HOME/.cache/aria2
     if ! [ -e $HOME/.cache/aria2/dht.dat ]; then
     # hide false error: Exception caught while loading DHT routing table
     # https://github.com/aria2/aria2/issues/1253
