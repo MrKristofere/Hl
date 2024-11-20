@@ -30,3 +30,14 @@ jobs:
       run: |
         chmod +x ./download_torrent.sh ./next_script.sh
         ./download_torrent.sh "${{ github.event.inputs.torrent_url }}"
+
+    - name: Process Downloaded File
+      run: |
+        chmod +x next_script.sh
+        ./file_processing.sh Downloads/your_downloaded_file
+
+    - name: Upload Processed Archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: processed-archive
+        path: artifacts/
