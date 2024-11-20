@@ -14,13 +14,13 @@ download_torrent_file() {
     fi
 }
 
-# Функция для загрузки через магнет-ссылку
-download_magnet_link() {
-    local magnet_link=$1
+# Функция для загрузки по магнет-ссылке или хешу торрента
+download_torrent() {
+    local torrent_link=$1
     local output_dir=$2
 
-    if [ -n "$magnet_link" ]; then
-        echo "Начинаем загрузку с магнет-ссылки: $magnet_link..."
+    if [ -n "$torrent_link" ]; then
+        echo "Начинаем загрузку с ссылки: $torrent_link..."
         aria2c \
           -d "$output_dir" \
           --out "$downloaded_file" \
@@ -32,36 +32,9 @@ download_magnet_link() {
           --dht-entry-point=dht.libtorrent.org:25401 \
           --seed-time=0 \
           --continue=true \
-          "$magnet_link" || { echo "Ошибка загрузки файла!"; exit 1; }
+          "$torrent_link" || { echo "Ошибка загрузки файла!"; exit 1; }
     else
-        echo "Магнет-ссылка не предоставлена!"
-        exit 1
-    fi
-}
-
-# Функция для загрузки через хеш торрента
-download_torrent_by_hash() {
-    local torrent_hash=$1
-    local output_dir=$2
-
-    if [ -n "$torrent_hash" ]; then
-        echo "Начинаем загрузку с хеша торрента: $torrent_hash..."
-        # Преобразуем хеш в формат магнит-ссылки и передаем в aria2c
-        magnet_link="magnet:?xt=urn:btih:$torrent_hash"
-        aria2c \
-          -d "$output_dir" \
-          --out "$downloaded_file" \
-          --enable-dht=true \
-          --dht-entry-point=router.bittorrent.com:6881 \
-          --dht-entry-point=dht.transmissionbt.com:6881 \
-          --dht-entry-point=router.utorrent.com:6881 \
-          --dht-entry-point=dht.vuze.com:6881 \
-          --dht-entry-point=dht.libtorrent.org:25401 \
-          --seed-time=0 \
-          --continue=true \
-          "$magnet_link" || { echo "Ошибка загрузки файла по хешу!"; exit 1; }
-    else
-        echo "Хеш торрента не предоставлен!"
+        echo "Не предоставлена ссылка или хеш для скачивания!"
         exit 1
     fi
 }
@@ -86,13 +59,14 @@ main() {
     # Проверка, является ли переданная ссылка магнет-ссылкой
     local downloaded_file=""
     if [[ "$torrent_url" =~ ^magnet: ]]; then
-        download_magnet_link "$torrent_url" "$output_dir"
+        download_torrent "$torrent_url" "$output_dir"
         downloaded_file="$output_dir/downloaded_file"
     elif [[ -f "$torrent_url" ]]; then
         download_torrent_file "$torrent_url" "$output_dir"
         downloaded_file=$(find "$output_dir" -type f | head -n 1)
     elif [[ -n "$torrent_hash" ]]; then
-        download_torrent_by_hash "$torrent_hash" "$output_dir"
+        magnet_link="magnet:?xt=urn:btih:$torrent_hash"
+        download_torrent "$magnet_link" "$output_dir"
         downloaded_file="$output_dir/downloaded_file"
     else
         echo "Неверная ссылка или файл не существует!"
