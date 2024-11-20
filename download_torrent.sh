@@ -16,6 +16,7 @@ download_torrent_file() {
 }
 
 download_magnet_link() {
+    echo "Home directory is: $HOME"
     local magnet_link=$1
     local output_dir=$2
 
