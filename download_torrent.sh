@@ -8,6 +8,7 @@ download_torrent_file() {
     if [ -f "$torrent_file" ]; then
         echo "Начинаем загрузку с файла: $torrent_file..."
         aria2c -d "$output_dir" "$torrent_file" || { echo "Ошибка загрузки файла!"; exit 1; }
+        find ~/.cache/aria2
     else
         echo "Файл $torrent_file не найден!"
         exit 1
