@@ -45,7 +45,7 @@ jobs:
     - name: Process Downloaded File
       run: |
         chmod +x file_processing.sh
-        ./file_processing.sh Downloads/your_downloaded_file
+        ./file_processing.sh Downloads/*
 
     - name: Upload Processed Archive
       uses: actions/upload-artifact@v4
