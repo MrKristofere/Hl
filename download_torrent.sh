@@ -16,6 +16,7 @@ download_torrent_file() {
 }
 
 create_dht_dat() {
+    find $HOME
     mkdir -p $HOME/.cache/aria2
     chmod 755 $HOME/.cache/aria2
     if ! [ -e $HOME/.cache/aria2/dht.dat ]; then
@@ -48,6 +49,11 @@ download_magnet_link() {
           -d "$output_dir" \
           --out "$downloaded_file" \
           --enable-dht=true \
+          --dht-entry-point=router.bittorrent.com:6881 \
+          --dht-entry-point=dht.transmissionbt.com:6881 \
+          --dht-entry-point=router.utorrent.com:6881 \
+          --dht-entry-point=dht.vuze.com:6881 \
+          --dht-entry-point=dht.libtorrent.org:25401 \
           --seed-time=0 \
           --continue=true \
           "$magnet_link" || { echo "Ошибка загрузки файла!"; exit 1; }
