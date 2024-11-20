@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Проверка наличия aria2c
+if ! command -v aria2c &> /dev/null; then
+    echo "aria2c не установлен. Установите его и повторите попытку."
+    exit 1
+fi
+
 # Функция для загрузки через файл торрента
 download_torrent_file() {
     local torrent_file=$1
@@ -7,9 +13,8 @@ download_torrent_file() {
 
     if [ -f "$torrent_file" ]; then
         echo "Начинаем загрузку с файла: $torrent_file..."
-        aria2c -d "$output_dir" "$torrent_file" || { echo "Ошибка загрузки файла!"; exit 1; }
-        # Присваиваем результат скачивания
-        downloaded_file=$(find "$output_dir" -type f | head -n 1)
+        aria2c -d "$output_dir" "$torrent_file" || { echo "Ошибка загрузки файла $torrent_file!"; exit 1; }
+        downloaded_file="$output_dir/$(basename "$torrent_file" .torrent)"
     else
         echo "Файл $torrent_file не найден!"
         exit 1
@@ -25,18 +30,11 @@ download_magnet_link() {
         echo "Начинаем загрузку с магнет-ссылки: $magnet_link..."
         aria2c \
           -d "$output_dir" \
-          --out "$output_dir/downloaded_file" \
           --enable-dht=true \
-          --dht-entry-point=router.bittorrent.com:6881 \
-          --dht-entry-point=dht.transmissionbt.com:6881 \
-          --dht-entry-point=router.utorrent.com:6881 \
-          --dht-entry-point=dht.vuze.com:6881 \
-          --dht-entry-point=dht.libtorrent.org:25401 \
           --seed-time=0 \
           --continue=true \
-          "$magnet_link" || { echo "Ошибка загрузки файла!"; exit 1; }
-        # Присваиваем результат скачивания
-        downloaded_file="$output_dir/downloaded_file"
+          "$magnet_link" || { echo "Ошибка загрузки файла с магнет-ссылки!"; exit 1; }
+        downloaded_file="$output_dir/$(basename "$magnet_link" | cut -d'?' -f1)"
     else
         echo "Магнет-ссылка не предоставлена!"
         exit 1
@@ -50,7 +48,6 @@ download_torrent_by_hash() {
 
     if [ -n "$torrent_hash" ]; then
         echo "Начинаем загрузку с хеша торрента: $torrent_hash..."
-        # Преобразуем хеш в формат магнит-ссылки и передаем в aria2c
         magnet_link="magnet:?xt=urn:btih:$torrent_hash"
         download_magnet_link "$magnet_link" "$output_dir"
     else
@@ -61,38 +58,29 @@ download_torrent_by_hash() {
 
 # Главная функция
 main() {
-    # Параметры
-    local output_dir="$GITHUB_WORKSPACE/Downloads"  # Папка для скачивания в GitHub Actions
-    local torrent_url="$1"  # Получаем ссылку через параметры скрипта
-    local torrent_hash="$2"  # Получаем хеш торрента через параметры
-    local file_processing="./file_processing.sh"  # Путь к следующему скрипту
+    local output_dir="$GITHUB_WORKSPACE/Downloads"
+    local torrent_url="$1"
+    local torrent_hash="$2"
+    local file_processing="./file_processing.sh"
 
-    # Проверка, что передана ссылка или хеш
     if [ -z "$torrent_url" ] && [ -z "$torrent_hash" ]; then
         echo "Не указана ссылка или хеш для скачивания!"
         exit 1
     fi
 
-    # Создание директории для загрузок, если она не существует
     mkdir -p "$output_dir"
 
-    # Проверка, является ли переданная ссылка магнет-ссылкой или файлом
-    local downloaded_file=""
     if [[ "$torrent_url" =~ ^magnet: ]]; then
         download_magnet_link "$torrent_url" "$output_dir"
-        downloaded_file="$output_dir/downloaded_file"
     elif [[ -f "$torrent_url" ]]; then
         download_torrent_file "$torrent_url" "$output_dir"
-        downloaded_file="$output_dir/downloaded_file"
     elif [[ -n "$torrent_hash" ]]; then
         download_torrent_by_hash "$torrent_hash" "$output_dir"
-        downloaded_file="$output_dir/downloaded_file"
     else
         echo "Неверная ссылка или файл не существует!"
         exit 1
     fi
 
-    # Проверка существования файла
     if [ ! -f "$downloaded_file" ]; then
         echo "Ошибка: файл не найден после загрузки!"
         exit 1
@@ -100,10 +88,10 @@ main() {
 
     echo "Скачанный файл: $downloaded_file"
 
-    # Запуск следующего скрипта с передачей пути к файлу
     chmod +x "$file_processing"
     "$file_processing" "$downloaded_file"
 }
 
-# Запуск главной функции
+# Запуск главной функции с удалением временных файлов при выходе из скрипта.
+trap 'rm -f "$downloaded_file"' EXIT
 main "$@"
