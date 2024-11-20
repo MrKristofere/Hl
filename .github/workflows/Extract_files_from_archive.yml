@@ -31,40 +31,37 @@ jobs:
       - name: Create Download Directory
         run: mkdir -p download
 
-      - name: Check and Download Archive
+      - name: Check and Download Archive or Torrent
         run: |
           URL="${{ github.event.inputs.archive_url }}"
-          EXPECTED_CONTENT_TYPES=("application/zip" "application/vnd.rar" "application/x-7z-compressed" "application/x-tar" "application/gzip" "application/x-xz" "application/octet-stream")
+          EXPECTED_CONTENT_TYPES=("application/zip" "application/vnd.rar" "application/x-7z-compressed" "application/x-tar" "application/gzip" "application/x-xz" "application/octet-stream" "application/x-bittorrent")
 
-          # Функция для загрузки файла с помощью aria2
           download_file() {
               aria2c --max-tries=5 --referer="https://www.google.com" --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "$1" -d download || { echo "Download failed"; exit 1; }
           }
 
-          # Проверка URL с помощью curl и загрузка файла
           for attempt in {1..4}; do
               CONTENT_TYPE=$(curl -L -s -o /dev/null -w "%{content_type}" "$URL")
-    
-              if [[ " ${EXPECTED_CONTENT_TYPES[@]} " =~ " ${CONTENT_TYPE} " ]]; then
-                  echo "Содержимое корректное. Загружаем файл с помощью aria2..."
+
+              if [[ " ${EXPECTED_CONTENT_TYPES[@]} " =~ " ${CONTENT_TYPE} " ]] || [[ "$URL" == magnet:* ]]; then
+                  echo "Содержимое корректное или это magnet-ссылка. Загружаем файл с помощью aria2..."
                   download_file "$URL"
                   break
               else
                   echo "Получено некорректное содержимое: $CONTENT_TYPE. Попытка $attempt из 4."
-             if [ $attempt -eq 4 ]; then
+                  if [ $attempt -eq 4 ]; then
                       echo "Ошибка: файл не найден или получен HTML."
                       exit 1
                   fi
               fi
           done
 
-          echo "Downloaded archive files:"
+          echo "Downloaded archive or torrent files:"
           find download -type f | while read -r file; do
-            file_size_human=$(stat -c "%s" "$file")
-            file_size_readable=$(stat -c "%s" "$file" | numfmt --to=iec)
-            echo "$file $file_size_readable ($file_size_human bytes)"
+              file_size_human=$(stat -c "%s" "$file")
+              file_size_readable=$(stat -c "%s" "$file" | numfmt --to=iec)
+              echo "$file $file_size_readable ($file_size_human bytes)"
           done
-
       - name: Verify Downloaded Archive
         run: |
           for file in download/*; do
