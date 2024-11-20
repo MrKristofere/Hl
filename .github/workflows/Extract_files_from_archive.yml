@@ -29,7 +29,7 @@ jobs:
           sudo apt-get install -y aria2 p7zip-full p7zip-rar rar unrar python3 curl
 
       - name: Create Download Directory
-        run: mkdir -p ${{ github.workspace }}/download
+        run: mkdir -p download
 
       - name: Check and Download Archive
         run: |
@@ -38,7 +38,7 @@ jobs:
 
           # Функция для загрузки файла с помощью aria2
           download_file() {
-              aria2c --max-tries=5 --referer="https://www.google.com" --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "$1" -d ${{ github.workspace }}/download || { echo "Download failed"; exit 1; }
+              aria2c --max-tries=5 --referer="https://www.google.com" --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "$1" -d download || { echo "Download failed"; exit 1; }
           }
 
           # Проверка URL с помощью curl и загрузка файла
@@ -59,7 +59,7 @@ jobs:
           done
 
           echo "Downloaded archive files:"
-          find ${{ github.workspace }}/download -type f | while read -r file; do
+          find download -type f | while read -r file; do
             file_size_human=$(stat -c "%s" "$file")
             file_size_readable=$(stat -c "%s" "$file" | numfmt --to=iec)
             echo "$file $file_size_readable ($file_size_human bytes)"
@@ -67,7 +67,7 @@ jobs:
 
       - name: Verify Downloaded Archive
         run: |
-          for file in ${{ github.workspace }}/download/*; do
+          for file in download/*; do
             crc32_value=$(python3 -c "
           import zlib
           with open('$file', 'rb') as f:
@@ -78,12 +78,12 @@ jobs:
         continue-on-error: true
 
       - name: Create Extraction Directory
-        run: mkdir -p ${{ github.workspace }}/download/extracted_files
+        run: mkdir -p download/extracted_files
 
       - name: Extract files from archive
         run: |
           # Находим первый архивный файл в папке
-          ARCHIVE_FILE=$(find "$GITHUB_WORKSPACE/download" -type f -print -quit)
+          ARCHIVE_FILE=$(find "download" -type f -print -quit)
           if [ -z "$ARCHIVE_FILE" ]; then
             echo "No archive file found!"
             exit 1
@@ -99,27 +99,27 @@ jobs:
           echo "Extracting files with extensions: ${EXTENSIONS[*]}"
 
           # Создаём директорию для распакованных файлов
-          mkdir -p "$GITHUB_WORKSPACE/download/extracted_files"
+          mkdir -p "download/extracted_files"
 
           # Определяем формат архива и выполняем распаковку
           case "${ARCHIVE_FILE##*.}" in
             zip)
               for ext in "${EXTENSIONS[@]}"; do
-                unzip -j "$ARCHIVE_FILE" "$ext" -d "$GITHUB_WORKSPACE/download/extracted_files" || {
+                unzip -j "$ARCHIVE_FILE" "$ext" -d "download/extracted_files" || {
                   echo "Failed to extract files for extension $ext."
                   exit 1
                 }
               done
               ;;
             tar.gz)
-              tar -xzf "$ARCHIVE_FILE" -C "$GITHUB_WORKSPACE/download/extracted_files" --wildcards "${EXTENSIONS[@]}" || {
+              tar -xzf "$ARCHIVE_FILE" -C "download/extracted_files" --wildcards "${EXTENSIONS[@]}" || {
                 echo "Failed to extract files."
                 exit 1
               }
               ;;
             rar)
               for ext in "${EXTENSIONS[@]}"; do
-                unrar e "$ARCHIVE_FILE" "$GITHUB_WORKSPACE/download/extracted_files/" "$ext" || {
+                unrar e "$ARCHIVE_FILE" "download/extracted_files/" "$ext" || {
                   echo "Failed to extract files for extension $ext."
                   exit 1
                 }
@@ -128,7 +128,7 @@ jobs:
             7z)
               if 7z l "$ARCHIVE_FILE" | grep -q "$ext"; then
                 for ext in "${EXTENSIONS[@]}"; do
-                  7z x "$ARCHIVE_FILE" -o"$GITHUB_WORKSPACE/download/extracted_files" -ir!"$ext" || {
+                  7z x "$ARCHIVE_FILE" -o"$download/extracted_files" -ir!"$ext" || {
                     echo "Failed to extract files for extension $ext."
                     exit 1
                   }
@@ -146,7 +146,7 @@ jobs:
 
           # Выводим список извлечённых файлов
           echo "Extracted files:"
-          find "$GITHUB_WORKSPACE/download/extracted_files" -type f | while read -r file; do
+          find "download/extracted_files" -type f | while read -r file; do
             file_size_human=$(stat -c "%s" "$file")
             if command -v numfmt >/dev/null; then
               file_size_readable=$(numfmt --to=iec <<< "$file_size_human")
@@ -158,7 +158,7 @@ jobs:
           
       - name: Verify Extracted Files
         run: |
-          find "$GITHUB_WORKSPACE/download/extracted_files" -type f | while read -r file; do
+          find "download/extracted_files" -type f | while read -r file; do
               crc32_value=$(python3 -c "
           import zlib
           with open('$file', 'rb') as f:
@@ -173,6 +173,6 @@ jobs:
         with:
           tag_name: "${{ github.event.inputs.tag }}"
           files: |
-            ${{ github.workspace }}/download/extracted_files/*
+            download/extracted_files/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
