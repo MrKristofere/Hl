@@ -126,5 +126,5 @@ main() {
 }
 
 # Запуск главной функции с удалением временных файлов при выходе из скрипта.
-trap 'if [ -f "$downloaded_file" ]; then rm -f "$downloaded_file"; fi' EXIT
+#trap 'if [ -f "$downloaded_file" ]; then rm -f "$downloaded_file"; fi' EXIT
 main "$@"
