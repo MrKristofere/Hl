@@ -34,16 +34,17 @@ jobs:
       - name: Create DHT Cache Directory and File
         run: |
           mkdir -p ~/.cache/aria2
-          hex="a1 a2"
-          hex+="02" # format
-          hex+="00 00 00" # reserved
-          hex+="00 03" # version
-          hex+=$(printf "%016x\n" $(date --utc +%s)) # time
-          hex+="00 00 00 00 00 00 00 00" # localnode
-          hex+=$(dd if=/dev/urandom bs=1 count=40 status=none | sha1sum | cut -c1-40) # localnode ID
-          hex+="00 00 00 00" # reserved
-          hex+="00 00 00 00" # num_nodes uint32_t
-          hex+="00 00 00 00" # reserved
+          hex=""
+          hex+="a1 a2" # 0+2: magic
+          hex+="02" # 2+1: format
+          hex+="00 00 00" # 3+3
+          hex+="00 03" # 6+2: version
+          hex+=$(printf "%016x\n" $(date --utc +%s)) # 8+8: time
+          hex+="00 00 00 00 00 00 00 00" # 16+8: localnode
+          hex+=$(dd if=/dev/random bs=1 count=40 status=none | sha1sum - | cut -c1-40) # 24+20: localnode ID
+          hex+="00 00 00 00" # 44+4: reserved
+          hex+="00 00 00 00" # 48+4: num_nodes uint32_t
+          hex+="00 00 00 00" # 52+4: reserved
           echo $hex | xxd -r -p > ~/.cache/aria2/dht.dat
 
       - name: Check and Download Archive or Torrent
