@@ -106,7 +106,7 @@ jobs:
 
       - name: Make Archive
         run: |
-          7z a -mx=6 -mmt=on "download/extracted_files/extras/filebase.7z" "download/extracted_files/*" -x!"download/extracted_files"
+          7z a -mx=6 -mmt=on "download/extracted_files/extras/filebase.7z" "download/extracted_files/*" -x!"download/extracted_files\*\"
           7z l "download/extracted_files/extras/filebase.7z"
           
       - name: Upload to GitHub Releases
