@@ -35,7 +35,7 @@ main() {
     # Параметры
     local output_dir="$GITHUB_WORKSPACE/Downloads"  # Папка для скачивания в GitHub Actions
     local torrent_url="$1"  # Получаем ссылку через параметры скрипта
-    local next_script="./next_script.sh"  # Путь к следующему скрипту
+    local file_processing="./file_processing.sh"  # Путь к следующему скрипту
 
     # Проверка, что передана ссылка
     if [ -z "$torrent_url" ]; then
@@ -67,7 +67,7 @@ main() {
     echo "Скачанный файл: $downloaded_file"
 
     # Запуск следующего скрипта с передачей пути к файлу
-    if [ -x "$next_script" ]; then
+    if [ -x "$file_processing" ]; then
         "$file_processing" "$downloaded_file"
     else
         echo "Следующий скрипт ($file_processing) не найден или не является исполняемым!"
