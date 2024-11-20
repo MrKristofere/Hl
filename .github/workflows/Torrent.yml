@@ -19,7 +19,9 @@ jobs:
     - name: Создание директории и настройка прав доступа для aria2 cache
       run: |
         mkdir -p /home/runner/.cache/aria2
-        chmod 777 /home/runner/.cache/aria2
+        chmod 755 /home/runner/.cache/aria2
+        touch /home/runner/.cache/aria2/dht.dat
+        chmod 644 /home/runner/.cache/aria2/dht.dat
 
     - name: Установка aria2
       run: |
