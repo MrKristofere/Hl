@@ -37,7 +37,7 @@ jobs:
           EXPECTED_CONTENT_TYPES=("application/zip" "application/vnd.rar" "application/x-7z-compressed" "application/x-tar" "application/gzip" "application/x-xz" "application/octet-stream")
 
           download_file() {
-              aria2c --max-tries=5 --referer="https://www.google.com" --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "$1" -d download || { echo "Download failed"; exit 1; }
+              aria2c --summary-interval=15 --console-log-level=notice --show-console-readout=true --max-tries=5 --referer="https://www.google.com" --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "$1" -d download || { echo "Download failed"; exit 1; }
           }
 
           if [[ "$INPUT" =~ ^magnet: ]]; then
