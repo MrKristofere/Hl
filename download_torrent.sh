@@ -35,8 +35,14 @@ download_magnet_link() {
 
     if [ -n "$magnet_link" ]; then
         echo "Начинаем загрузку с магнет-ссылки: $magnet_link..."
-        
-        local filename=$(echo "$magnet_link" | sed -n 's/^magnet:[^?]*?dn=\( [^&]* \).*/\1/p')
+
+        # Извлекаем имя файла из параметра dn
+        local filename=$(echo "$magnet_link" | sed -n 's/.*dn=\( [^&]* \).*/\1/p' | sed 's/%20/ /g')
+
+        # Если имя не найдено, берем его из последней части ссылки
+        if [ -z "$filename" ]; then
+            filename=$(basename "$magnet_link" | cut -d'?' -f1)
+        fi
         
         aria2c \
             -d "$output_dir" \
