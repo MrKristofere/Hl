@@ -40,7 +40,7 @@ jobs:
           hex+="00 03" # version
           hex+=$(printf "%016x\n" $(date --utc +%s)) # time
           hex+="00 00 00 00 00 00 00 00" # localnode
-          hex+=$(dd if=/dev/random bs=1 count=40 status=none | sha1sum | cut -c1-40) # localnode ID
+          hex+=$(dd if=/dev/urandom bs=1 count=40 status=none | sha1sum | cut -c1-40) # localnode ID
           hex+="00 00 00 00" # reserved
           hex+="00 00 00 00" # num_nodes uint32_t
           hex+="00 00 00 00" # reserved
@@ -52,7 +52,7 @@ jobs:
           EXPECTED_CONTENT_TYPES=("application/zip" "application/vnd.rar" "application/x-7z-compressed" "application/x-tar" "application/gzip" "application/x-xz" "application/octet-stream")
 
           download_file() {
-              aria2c --summary-interval=15 --enable-dht=true --console-log-level=notice --show-console-readout=true --max-tries=5 --referer="https://www.google.com" --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "$1" -d download || { echo "Download failed"; exit 1; }
+            aria2c --summary-interval=15 --enable-dht=true --console-log-level=debug --show-console-readout=true --max-tries=5 --referer="https://www.google.com" --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" "$1" -d download || { echo "Download failed"; exit 1; }
           }
 
           if [[ "$INPUT" =~ ^magnet: ]]; then
@@ -75,11 +75,7 @@ jobs:
           fi
 
           echo "Downloaded files:"
-          find download -type f | while read -r file; do
-              file_size_human=$(stat -c "%s" "$file")
-              file_size_readable=$(stat -c "%s" "$file" | numfmt --to=iec)
-              echo "$file $file_size_readable ($file_size_human bytes)"
-          done
+          find download -type f -print0 | xargs -0 stat --format="%n %s"
           
       - name: Verify Downloaded Archive
         run: |
