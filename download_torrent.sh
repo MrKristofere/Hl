@@ -36,15 +36,17 @@ download_magnet_link() {
     if [ -n "$magnet_link" ]; then
         echo "Начинаем загрузку с магнет-ссылки: $magnet_link..."
         
+        local filename=$(echo "$magnet_link" | sed -n 's/^magnet:[^?]*?dn=\( [^&]* \).*/\1/p')
+        
         aria2c \
             -d "$output_dir" \
             --enable-dht=true \
             --seed-time=0 \
             --continue=true \
-            --out "$(basename "$magnet_link" | cut -d'?' -f1)" \
+            --out "$filename" \
             "$magnet_link" || { echo "Ошибка загрузки файла с магнет-ссылки!"; exit 1; }
         
-        downloaded_file="$output_dir/$(basename "$magnet_link" | cut -d'?' -f1)"
+        downloaded_file="$output_dir/$filename"
     else
         echo "Магнет-ссылка не предоставлена!"
         exit 1
@@ -78,6 +80,11 @@ main() {
         exit 1
     fi
 
+    if [ -z "$GITHUB_WORKSPACE" ]; then
+        echo "Переменная GITHUB_WORKSPACE не установлена!"
+        exit 1
+    fi
+
     mkdir -p "$output_dir"
 
     # Скачиваем через магнет-ссылку или файл торрента
@@ -93,7 +100,7 @@ main() {
     fi
 
     # Проверка наличия загруженного файла
-    if [ ! -f "$downloaded_file" ]; then
+    if [ -z "$downloaded_file" ] || [ ! -f "$downloaded_file" ]; then
         echo "Ошибка: файл не найден после загрузки!"
         exit 1
     fi
