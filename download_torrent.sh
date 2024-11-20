@@ -115,10 +115,15 @@ main() {
     # Обработка входного параметра
     process_input "$input" "$output_dir"
 
-    # Проверка наличия загруженного файла
-    if [ -z "$downloaded_file" ] || [ ! -f "$downloaded_file" ]; then
-        echo "Ошибка: файл не найден после загрузки!"
-        exit 1
+    # Проверка наличия загруженного файла (с учетом возможных изменений имени)
+    if [ ! -f "$downloaded_file" ]; then
+        # Попробуем найти файл в директории Downloads по шаблону имени (если оно было изменено)
+        downloaded_file=$(find "$output_dir" -type f -name "*$(basename "${input%%\&*}")*")
+        
+        if [ ! -f "$downloaded_file" ]; then
+            echo "Ошибка: файл не найден после загрузки!"
+            exit 1
+        fi 
     fi
 
     echo "Скачанный файл: $downloaded_file"
