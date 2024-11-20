@@ -68,9 +68,9 @@ main() {
 
     # Запуск следующего скрипта с передачей пути к файлу
     if [ -x "$next_script" ]; then
-        "$next_script" "$downloaded_file"
+        "$file_processing" "$downloaded_file"
     else
-        echo "Следующий скрипт ($next_script) не найден или не является исполняемым!"
+        echo "Следующий скрипт ($file_processing) не найден или не является исполняемым!"
         exit 1
     fi
 }
