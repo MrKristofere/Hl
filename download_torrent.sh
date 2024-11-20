@@ -22,6 +22,7 @@ download_torrent_file() {
             "$torrent_file" || { echo "Ошибка загрузки файла $torrent_file!"; exit 1; }
         
         downloaded_file="$output_dir/$(basename "$torrent_file" .torrent)"
+        echo "Файл загружен: $downloaded_file"
     else
         echo "Файл $torrent_file не найден!"
         exit 1
@@ -37,11 +38,11 @@ download_magnet_link() {
         echo "Начинаем загрузку с магнет-ссылки: $magnet_link..."
 
         # Извлекаем имя файла из параметра dn
-        local filename=$(echo "$magnet_link" | sed -n 's/.*dn=\( [^&]* \).*/\1/p' | sed 's/%20/ /g')
+        local filename=$(echo "$magnet_link" | sed -n 's/.*dn=\([^&]*\).*/\1/p' | sed 's/%20/ /g')
 
-        # Если имя не найдено, берем его из последней части ссылки
+        # Если имя не найдено, берем его из последней части ссылки или задаем имя по умолчанию
         if [ -z "$filename" ]; then
-            filename=$(basename "$magnet_link" | cut -d'?' -f1)
+            filename="downloaded_file"  # Имя по умолчанию, если не удалось извлечь
         fi
         
         aria2c \
@@ -53,6 +54,7 @@ download_magnet_link() {
             "$magnet_link" || { echo "Ошибка загрузки файла с магнет-ссылки!"; exit 1; }
         
         downloaded_file="$output_dir/$filename"
+        echo "Файл загружен: $downloaded_file"
     else
         echo "Магнет-ссылка не предоставлена!"
         exit 1
@@ -126,5 +128,6 @@ main() {
 }
 
 # Запуск главной функции с удалением временных файлов при выходе из скрипта.
-#trap 'if [ -f "$downloaded_file" ]; then rm -f "$downloaded_file"; fi' EXIT
+trap 'if [ -f "$downloaded_file" ]; then rm -f "$downloaded_file"; fi' EXIT
+
 main "$@"
