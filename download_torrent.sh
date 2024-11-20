@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# Проверка на наличие aria2
-if ! command -v aria2c &> /dev/null; then
-    echo "aria2 не найден, устанавливаем..."
-    sudo apt-get update
-    sudo apt-get install -y aria2
-fi
-
 # Функция для загрузки через файл торрента
 download_torrent_file() {
     local torrent_file=$1
