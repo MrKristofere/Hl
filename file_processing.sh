@@ -15,7 +15,7 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 # Получаем путь к скачанному файлу
-downloaded_file="$1"
+downloaded_file=$(Downloads/*)
 
 if [ -z "$downloaded_file" ]; then
     echo "Не передан путь к скачанному файлу!"
