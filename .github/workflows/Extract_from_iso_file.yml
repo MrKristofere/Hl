@@ -106,7 +106,7 @@ jobs:
 
       - name: Make Archive
         run: |
-          find download/extracted_files -mindepth 1 \( -type f -o -type d \) > filelist.txt | 7z a -mx=6 -mmt=on "download/extracted_files/extras/filebase.7z" @filelist.txt
+          7z a -mx=6 -mmt=on "download/extracted_files/extras/filebase.7z" * -x!*/
           7z l "download/extracted_files/extras/filebase.7z"
           
       - name: Upload to GitHub Releases
