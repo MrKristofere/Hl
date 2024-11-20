@@ -31,10 +31,23 @@ jobs:
       - name: Create Download Directory
         run: mkdir -p download
 
-      - name: Check and Download Archive or Torrent
+      - name: Create DHT Cache Directory and File
         run: |
           mkdir -p ~/.cache/aria2
-          touch ~/.cache/aria2/dht.dat
+          hex="a1 a2"
+          hex+="02" # format
+          hex+="00 00 00" # reserved
+          hex+="00 03" # version
+          hex+=$(printf "%016x\n" $(date --utc +%s)) # time
+          hex+="00 00 00 00 00 00 00 00" # localnode
+          hex+=$(dd if=/dev/random bs=1 count=40 status=none | sha1sum | cut -c1-40) # localnode ID
+          hex+="00 00 00 00" # reserved
+          hex+="00 00 00 00" # num_nodes uint32_t
+          hex+="00 00 00 00" # reserved
+          echo $hex | xxd -r -p > ~/.cache/aria2/dht.dat
+
+      - name: Check and Download Archive or Torrent
+        run: |
           INPUT="${{ github.event.inputs.url }}"
           EXPECTED_CONTENT_TYPES=("application/zip" "application/vnd.rar" "application/x-7z-compressed" "application/x-tar" "application/gzip" "application/x-xz" "application/octet-stream")
 
