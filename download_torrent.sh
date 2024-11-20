@@ -6,6 +6,9 @@ if ! command -v aria2c &> /dev/null; then
     exit 1
 fi
 
+# Объявление глобальной переменной для скачанного файла
+downloaded_file=""
+
 # Функция для загрузки через файл торрента
 download_torrent_file() {
     local torrent_file=$1
@@ -28,13 +31,13 @@ download_magnet_link() {
 
     if [ -n "$magnet_link" ]; then
         echo "Начинаем загрузку с магнет-ссылки: $magnet_link..."
+        downloaded_file="$output_dir/$(basename "$magnet_link" | cut -d'?' -f1)"
         aria2c \
           -d "$output_dir" \
           --enable-dht=true \
           --seed-time=0 \
           --continue=true \
-          "$magnet_link" || { echo "Ошибка загрузки файла с магнет-ссылки!"; exit 1; }
-        downloaded_file="$output_dir/$(basename "$magnet_link" | cut -d'?' -f1)"
+          --out "$(basename "$downloaded_file")" "$magnet_link" || { echo "Ошибка загрузки файла с магнет-ссылки!"; exit 1; }
     else
         echo "Магнет-ссылка не предоставлена!"
         exit 1
@@ -93,5 +96,5 @@ main() {
 }
 
 # Запуск главной функции с удалением временных файлов при выходе из скрипта.
-trap 'rm -f "$downloaded_file"' EXIT
+trap 'if [ -f "$downloaded_file" ]; then rm -f "$downloaded_file"; fi' EXIT
 main "$@"
