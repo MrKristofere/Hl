@@ -16,16 +16,15 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Создание директории и настройка прав доступа для aria2 cache
-      run: |
-        mkdir -p /home/runner/.cache/aria2
-        chmod 755 /home/runner/.cache/aria2
-        chmod 755 /home/runner/.cache/aria2/dht.dat
-
     - name: Установка aria2
       run: |
         sudo apt-get update
         sudo apt-get install -y aria2
+
+    - name: Создание директории для aria2 cache
+      run: |
+        mkdir -p /home/runner/.cache/aria2
+        chmod 755 /home/runner/.cache/aria2
 
     - name: Скачивание и обработка файла
       run: |
