@@ -66,7 +66,7 @@ download_torrent_by_hash() {
 
     if [ -n "$torrent_hash" ]; then
         echo "Конвертируем хеш торрента в магнет-ссылку..."
-        magnet_link="magnet:?xt=urn:btih:$torrent_hash"
+        magnet_link="magnet:?xt=urn:btih:$torrent_hash&tr=udp://tracker.openbittorrent.com:80&tr=udp://tracker.opentrackr.org:1337/announce"
         download_magnet_link "$magnet_link" "$output_dir"
     else
         echo "Хеш торрента не предоставлен!"
