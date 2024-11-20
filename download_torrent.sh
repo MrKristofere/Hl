@@ -48,11 +48,6 @@ download_magnet_link() {
           -d "$output_dir" \
           --out "$downloaded_file" \
           --enable-dht=true \
-          --dht-entry-point=router.bittorrent.com:6881 \
-          --dht-entry-point=dht.transmissionbt.com:6881 \
-          --dht-entry-point=router.utorrent.com:6881 \
-          --dht-entry-point=dht.vuze.com:6881 \
-          --dht-entry-point=dht.libtorrent.org:25401 \
           --seed-time=0 \
           --continue=true \
           "$magnet_link" || { echo "Ошибка загрузки файла!"; exit 1; }
