@@ -15,30 +15,6 @@ download_torrent_file() {
     fi
 }
 
-create_dht_dat() {
-    find $HOME
-    mkdir -p $HOME/.cache/aria2
-    chmod 755 $HOME/.cache/aria2
-    if ! [ -e $HOME/.cache/aria2/dht.dat ]; then
-    # hide false error: Exception caught while loading DHT routing table
-    # https://github.com/aria2/aria2/issues/1253
-    # based on aria2/src/DHTRoutingTableDeserializer.cc
-    hex="a1 a2"
-    hex+="02" # format
-    hex+="00 00 00" # reserved
-    hex+="00 03" # version
-    hex+=$(printf "%016x\n" $(date --utc +%s)) # time
-    hex+="00 00 00 00 00 00 00 00" # localnode
-    hex+=$(dd if=/dev/urandom bs=1 count=40 status=none | sha1sum | cut -c1-40) # localnode ID
-    hex+="00 00 00 00" # reserved
-    hex+="00 00 00 00" # num_nodes uint32_t
-    hex+="00 00 00 00" # reserved
-    # 56 bytes
-    mkdir -p $HOME/.cache/aria2
-    echo $hex | xxd -r -p >$HOME/.cache/aria2/dht.dat
-  fi
-}
-
 download_magnet_link() {
     local magnet_link=$1
     local output_dir=$2
