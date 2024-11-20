@@ -25,6 +25,8 @@ jobs:
       run: |
         mkdir -p ~/.cache/aria2
         chmod 755 ~/.cache/aria2
+        touch ~/.cache/aria2/dht.dat
+        chmod 755 ~/.cache/aria2/dht.dat
 
     - name: Скачивание и обработка файла
       run: |
