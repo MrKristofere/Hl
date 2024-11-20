@@ -21,7 +21,7 @@ download_magnet_link() {
 
     if [ -n "$magnet_link" ]; then
         echo "Начинаем загрузку с магнет-ссылки: $magnet_link..."
-        aria2c -d "$output_dir" --out "$downloaded_file" --enable-dht=true --continue=true --dht-file-path="~/.cache/aria2/dht.dat" "$magnet_link" || { echo "Ошибка загрузки файла!"; exit 1; }
+        aria2c -d "$output_dir" --out "$downloaded_file" --enable-dht=true --no-seed --continue=true --dht-file-path="~/.cache/aria2/dht.dat" "$magnet_link" || { echo "Ошибка загрузки файла!"; exit 1; }
     else
         echo "Магнет-ссылка не предоставлена!"
         exit 1
