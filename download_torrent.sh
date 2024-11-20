@@ -8,6 +8,8 @@ download_torrent_file() {
     if [ -f "$torrent_file" ]; then
         echo "Начинаем загрузку с файла: $torrent_file..."
         aria2c -d "$output_dir" "$torrent_file" || { echo "Ошибка загрузки файла!"; exit 1; }
+        # Присваиваем результат скачивания
+        downloaded_file=$(find "$output_dir" -type f | head -n 1)
     else
         echo "Файл $torrent_file не найден!"
         exit 1
@@ -23,7 +25,7 @@ download_magnet_link() {
         echo "Начинаем загрузку с магнет-ссылки: $magnet_link..."
         aria2c \
           -d "$output_dir" \
-          --out "$downloaded_file" \
+          --out "$output_dir/downloaded_file" \
           --enable-dht=true \
           --dht-entry-point=router.bittorrent.com:6881 \
           --dht-entry-point=dht.transmissionbt.com:6881 \
@@ -33,21 +35,24 @@ download_magnet_link() {
           --seed-time=0 \
           --continue=true \
           "$magnet_link" || { echo "Ошибка загрузки файла!"; exit 1; }
+        # Присваиваем результат скачивания
+        downloaded_file="$output_dir/downloaded_file"
     else
         echo "Магнет-ссылка не предоставлена!"
         exit 1
     fi
 }
 
-# Функция для загрузки по хешу торрента
+# Функция для загрузки через хеш торрента
 download_torrent_by_hash() {
     local torrent_hash=$1
     local output_dir=$2
 
     if [ -n "$torrent_hash" ]; then
         echo "Начинаем загрузку с хеша торрента: $torrent_hash..."
-        magnet_link="magnet:?xt=urn:btih:$torrent_hash"  # Генерируем магнет-ссылку
-        download_magnet_link "$magnet_link" "$output_dir"  # Загружаем по магнет-ссылке
+        # Преобразуем хеш в формат магнит-ссылки и передаем в aria2c
+        magnet_link="magnet:?xt=urn:btih:$torrent_hash"
+        download_magnet_link "$magnet_link" "$output_dir"
     else
         echo "Хеш торрента не предоставлен!"
         exit 1
@@ -78,7 +83,7 @@ main() {
         downloaded_file="$output_dir/downloaded_file"
     elif [[ -f "$torrent_url" ]]; then
         download_torrent_file "$torrent_url" "$output_dir"
-        downloaded_file=$(find "$output_dir" -type f | head -n 1)
+        downloaded_file="$output_dir/downloaded_file"
     elif [[ -n "$torrent_hash" ]]; then
         download_torrent_by_hash "$torrent_hash" "$output_dir"
         downloaded_file="$output_dir/downloaded_file"
