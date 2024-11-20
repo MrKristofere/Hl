@@ -1,0 +1,29 @@
+name: Torrent Download with Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      torrent_url:
+        description: 'URL или путь к торрент файлу или магнет-ссылка'
+        required: true
+        default: ''  # Можете указать значение по умолчанию, если хотите
+
+jobs:
+  download_torrent:
+    runs-on: ubuntu-latest  # Используем Ubuntu
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Установка aria2
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y aria2
+
+    - name: Скачивание торрент файла или магнет-ссылки
+      run: |
+        # Указываем путь к скрипту
+        chmod +x ./download_torrent.sh
+        # Запускаем скрипт с передачей ссылки, полученной через inputs
+        ./download_torrent.sh "${{ github.event.inputs.torrent_url }}"
