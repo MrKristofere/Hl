@@ -2,6 +2,11 @@ name: Install PowerShell and Run Script
 
 on: 
   workflow_dispatch:
+    inputs:
+      url:
+        description: 'Link'
+        required: true
+        type: string
 
 jobs:
   build:
@@ -22,7 +27,7 @@ jobs:
       - name: Download your file
         run: |
           # Замените URL на URL вашего файла
-          Invoke-WebRequest -Uri "https://example.com/yourfile" -OutFile "WSAPackagingTool/unpack.cmd"
+          Invoke-WebRequest -Uri "${{ inputs.url }}" -OutFile "WSAPackagingTool/unpack.cmd"
 
       - name: Run unpack.cmd
         run: |
