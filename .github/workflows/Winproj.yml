@@ -25,12 +25,12 @@ jobs:
         run: git clone https://github.com/MlgmXyysd/WSAPackagingTool.git
 
       - name: Download your file
-        id: file
         run: |
           Invoke-WebRequest -Uri "${{ inputs.url }}" -OutFile "WSAPackagingTool"
           
       - name: check
         shell: bash
+        id: file
         run: |
           echo "filename=$(find WSAPackagingTool -name '*.Msixbundle')" >> $GITHUB_OUTPUT
 
