@@ -17,19 +17,24 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install PowerShell 7+
+        working-directory: dl
         run: |
           Invoke-WebRequest -Uri https://github.com/PowerShell/PowerShell/releases/tag/v7.4.6/download/PowerShell-7.4.6-win-x64.msi -OutFile pwsh.msi
           Start-Process msiexec.exe -ArgumentList '/i pwsh.msi /quiet /norestart' -NoNewWindow -Wait
 
       - name: Clone WSAPackagingTool repository
+        working-directory: dl
         run: git clone https://github.com/MlgmXyysd/WSAPackagingTool.git
 
       - name: Download your file
+        working-directory: dl
+        id: file
         run: |
-          # Замените URL на URL вашего файла
           Invoke-WebRequest -Uri "${{ inputs.url }}" -OutFile "WSAPackagingTool/unpack.cmd"
+          echo "filename=$(find type -name '*.Msixbundle')" >> $GITHUB_OUTPUT
 
       - name: Run unpack.cmd
+        working-directory: dl
         run: |
           cd WSAPackagingTool
-          .\unpack.cmd yourfile
+          unpack.cmd "${{ steps.dl.outputs.filename }}"
