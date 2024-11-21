@@ -28,7 +28,11 @@ jobs:
         id: file
         run: |
           Invoke-WebRequest -Uri "${{ inputs.url }}" -OutFile "WSAPackagingTool"
-          echo "filename=$(find -name '*.Msixbundle')" >> $GITHUB_OUTPUT
+          
+      - name: check
+        shell: bash
+        run: |
+          echo "filename=$(find WSAPackagingTool -name '*.Msixbundle')" >> $GITHUB_OUTPUT
 
       - name: Run unpack.cmd
         run: |
