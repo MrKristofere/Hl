@@ -22,18 +22,15 @@ jobs:
           Start-Process msiexec.exe -ArgumentList '/i pwsh.msi /quiet /norestart' -NoNewWindow -Wait
 
       - name: Clone WSAPackagingTool repository
-        working-directory: dl
         run: git clone https://github.com/MlgmXyysd/WSAPackagingTool.git
 
       - name: Download your file
-        working-directory: dl
         id: file
         run: |
-          Invoke-WebRequest -Uri "${{ inputs.url }}" -OutFile "WSAPackagingTool/unpack.cmd"
-          echo "filename=$(find type -name '*.Msixbundle')" >> $GITHUB_OUTPUT
+          Invoke-WebRequest -Uri "${{ inputs.url }}" -OutFile "WSAPackagingTool"
+          echo "filename=$(find -name '*.Msixbundle')" >> $GITHUB_OUTPUT
 
       - name: Run unpack.cmd
-        working-directory: dl
         run: |
           cd WSAPackagingTool
-          unpack.cmd "${{ steps.dl.outputs.filename }}"
+          ./unpack.cmd "${{ steps.file.outputs.filename }}"
