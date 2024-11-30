@@ -193,6 +193,6 @@ jobs:
         with:
           tag_name: "${{ github.event.inputs.tag }}"
           files: |
-            download/extracted_files/*
+            download/extracted_files/extras/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
