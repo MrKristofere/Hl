@@ -105,7 +105,7 @@ jobs:
           7z l "$ARCHIVE_FILE" || true
 
           # Устанавливаем список расширений
-          EXTENSIONS=("*.dll")
+          EXTENSIONS=("*.dll" "*.ini")
           if [ "${{ github.event.inputs.extract_exe }}" == "true" ]; then
             EXTENSIONS+=("*.exe")
           fi
