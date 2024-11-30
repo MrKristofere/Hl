@@ -141,8 +141,7 @@ jobs:
               if 7z l "$ARCHIVE_FILE" | grep -q "$ext"; then
                 for ext in "${EXTENSIONS[@]}"; do
                   7z x "$ARCHIVE_FILE" -o"download/extracted_files" -ir!"$ext" || {
-                    echo "Failed to extract files for extension $ext."
-                    exit 1
+                    echo "Some files could not be extracted, but continuing."
                   }
                 done
               else
