@@ -119,9 +119,8 @@ jobs:
             zip)
               for ext in "${EXTENSIONS[@]}"; do
                 unzip -j "$ARCHIVE_FILE" "$ext" -d "download/extracted_files" || {
-                  echo "Failed to extract files for extension $ext."
-                  exit 1
-                }
+                  echo "No files found for extension $ext, skipping."
+              }
               done
               ;;
             tar.gz)
