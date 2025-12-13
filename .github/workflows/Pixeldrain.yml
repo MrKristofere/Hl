@@ -1,0 +1,69 @@
+name: Upload to Pixeldrain
+
+on:
+  workflow_dispatch:  # Ручной запуск
+    inputs:
+      file_url:
+        description: 'URL файла для загрузки'
+        required: true
+        type: string
+      file_name:
+        description: 'Имя файла (необязательно)'
+        required: false
+        type: string
+  # Или по расписанию/пушам:
+  # schedule:
+  #   - cron: '0 0 * * *'  # Ежедневно в полночь
+  # push:
+  #   branches: [ main ]
+
+jobs:
+  upload-file:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Upload file to Pixeldrain
+      env:
+        PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
+        FILE_URL: ${{ github.event.inputs.file_url || 'https://example.com/default-file.zip' }}
+        FILE_NAME: ${{ github.event.inputs.file_name || '' }}
+      run: |
+        # Кодируем API ключ в Base64
+        AUTH_HEADER=$(echo -n "api:$PIXELDRAIN_API_KEY" | base64)
+        
+        # Подготавливаем данные для запроса
+        REQUEST_DATA="{\"url\":\"$FILE_URL\"}"
+        
+        # Добавляем имя файла, если указано
+        if [ -n "$FILE_NAME" ]; then
+          REQUEST_DATA="{\"url\":\"$FILE_URL\",\"name\":\"$FILE_NAME\"}"
+        fi
+        
+        # Отправляем запрос на загрузку
+        echo "Начинаем загрузку файла: $FILE_URL"
+        
+        RESPONSE=$(curl -s -X POST \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Basic $AUTH_HEADER" \
+          -d "$REQUEST_DATA" \
+          https://pixeldrain.com/api/file/remote_upload)
+        
+        # Парсим ID файла из ответа
+        FILE_ID=$(echo $RESPONSE | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+        
+        if [ -n "$FILE_ID" ]; then
+          echo "✅ Файл успешно поставлен в очередь загрузки!"
+          echo "ID файла: $FILE_ID"
+          echo "Ссылка для скачивания: https://pixeldrain.com/u/$FILE_ID"
+          echo "Ссылка для просмотра: https://pixeldrain.com/l/$FILE_ID"
+          echo "Прямая ссылка: https://pixeldrain.com/api/file/$FILE_ID"
+          
+          # Сохраняем ссылку в output
+          echo "pixeldrain_url=https://pixeldrain.com/u/$FILE_ID" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Ошибка при загрузке: $RESPONSE"
+          exit 1
+        fi
+    
+    outputs:
+      pixeldrain_url: ${{ steps.upload-file.outputs.pixeldrain_url }}
