@@ -1,58 +1,105 @@
-name: Debug pCloud Auth
+name: Get pCloud Token (Correct)
 
 on:
   workflow_dispatch:
 
 jobs:
-  debug:
+  get-token:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Debug Authentication
+    - name: Get pCloud Auth Token
       env:
         PCLOUD_EMAIL: ${{ secrets.PCLOUD_EMAIL }}
         PCLOUD_PASSWORD: ${{ secrets.PCLOUD_PASSWORD }}
       run: |
-        echo "=== ДИАГНОСТИКА АВТОРИЗАЦИИ ==="
+        echo "=== ПОЛУЧЕНИЕ ТОКЕНА PCLOUD ==="
         
-        # Показать что в переменных (без пароля)
-        echo "Email (первые 10 символов): '${PCLOUD_EMAIL:0:10}'"
-        echo "Длина email: ${#PCLOUD_EMAIL}"
-        echo "Длина пароля: ${#PCLOUD_PASSWORD}"
+        # 1. Диагностика (показываем все символы)
+        echo "📧 Email: '$PCLOUD_EMAIL'"
+        echo "📏 Длина email: ${#PCLOUD_EMAIL} символов"
+        echo "🔒 Длина пароля: ${#PCLOUD_PASSWORD} символов"
         
-        # Тест 1: Простой запрос
-        echo -e "\n🔍 Тест 1: Простой запрос"
-        curl -s -X POST \
-          -d "getauth=1&username=test@example.com&password=test123" \
-          https://api.pcloud.com/userinfo | grep -o '"result":[0-9]*'
+        # Покажем побайтово
+        echo -n "🔍 Email в hex: "
+        echo -n "$PCLOUD_EMAIL" | od -An -tx1 | tr -d '\n'
+        echo ""
         
-        # Тест 2: С нашими данными через --data-urlencode
-        echo -e "\n🔍 Тест 2: С нашими данными"
-        curl -s -X POST \
+        # 2. Тест с ВСЕМИ рекомендуемыми параметрами из документации
+        echo -e "\n🧪 Тест с полными параметрами:"
+        
+        # Согласно документации:
+        # - getauth=1 - обязателен для получения токена
+        # - device - рекомендуется указать
+        # - authexpire - можно указать срок (в секундах)
+        
+        DEVICE_NAME="github-actions-$(date +%s)"
+        
+        RESPONSE=$(curl -s -X POST \
           --data-urlencode "getauth=1" \
           --data-urlencode "username=$PCLOUD_EMAIL" \
           --data-urlencode "password=$PCLOUD_PASSWORD" \
-          https://api.pcloud.com/userinfo
+          --data-urlencode "device=$DEVICE_NAME" \
+          --data-urlencode "authexpire=31536000" \  # 1 год
+          --data-urlencode "authinactiveexpire=2678400" \  # 1 месяц неактивности
+          https://api.pcloud.com/userinfo)
         
-        # Тест 3: С закодированными данными
-        echo -e "\n🔍 Тест 3: С кодированием"
+        echo "Ответ: $RESPONSE"
         
-        # Создаем временные файлы для безопасной передачи
-        cat > /tmp/email.txt << EOF
-        $PCLOUD_EMAIL
-        EOF
+        # 3. Извлекаем токен
+        AUTH_TOKEN=$(echo "$RESPONSE" | grep -o '"auth":"[^"]*"' | cut -d'"' -f4)
         
-        cat > /tmp/password.txt << EOF
-        $PCLOUD_PASSWORD
-        EOF
-        
-        # Кодируем из файлов
-        ENC_EMAIL=$(python3 -c "import urllib.parse; print(urllib.parse.quote(open('/tmp/email.txt').read().strip()))")
-        ENC_PASS=$(python3 -c "import urllib.parse; print(urllib.parse.quote(open('/tmp/password.txt').read().strip()))")
-        
-        curl -s -X POST \
-          -d "getauth=1&username=$ENC_EMAIL&password=$ENC_PASS" \
-          https://api.pcloud.com/userinfo | grep -o '"result":[0-9]*\|"auth":"[^"]*"'
-        
-        # Очистка
-        rm -f /tmp/email.txt /tmp/password.txt
+        if [ -n "$AUTH_TOKEN" ]; then
+          echo -e "\n✅ УСПЕХ! Auth token получен"
+          echo "Токен: ${AUTH_TOKEN:0:20}..."
+          echo "Устройство: $DEVICE_NAME"
+          
+          # 4. Проверяем токен
+          echo -e "\n🔍 Проверяем токен..."
+          CHECK_RESPONSE=$(curl -s "https://api.pcloud.com/userinfo?auth=$AUTH_TOKEN")
+          
+          if echo "$CHECK_RESPONSE" | grep -q '"result":0'; then
+            echo "✅ Токен работает!"
+            
+            # 5. Создаем ДОЛГОСРОЧНЫЙ токен через gettoken
+            echo -e "\n🔄 Создаем долгосрочный токен..."
+            LONG_RESPONSE=$(curl -s -X POST \
+              "https://api.pcloud.com/gettoken?auth=$AUTH_TOKEN&expires=31536000&access=readwrite&appname=GitHub%20Actions")
+            
+            echo "Ответ gettoken: $LONG_RESPONSE"
+            
+            LONG_TOKEN=$(echo "$LONG_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+            
+            if [ -n "$LONG_TOKEN" ]; then
+              echo -e "\n🎉 ДОЛГОСРОЧНЫЙ ТОКЕН СОЗДАН!"
+              echo "================================"
+              echo "$LONG_TOKEN"
+              echo "================================"
+              echo ""
+              echo "💡 Сохраните как PCLOUD_LONG_TOKEN в GitHub Secrets"
+            else
+              echo "❌ Не удалось создать долгосрочный токен"
+            fi
+            
+          else
+            echo "❌ Токен не работает"
+          fi
+          
+        else
+          echo -e "\n❌ ОШИБКА: Auth token не получен"
+          
+          # Анализируем ошибку
+          if echo "$RESPONSE" | grep -q '"result":2000'; then
+            echo "   Код 2000: Log in failed"
+            echo ""
+            echo "🔧 ВОЗМОЖНЫЕ ПРИЧИНЫ:"
+            echo "1. Неверный email или пароль"
+            echo "2. Включена 2FA (нужен код из приложения)"
+            echo "3. Аккаунт заблокирован"
+            echo ""
+            echo "🛠️  РЕШЕНИЕ:"
+            echo "1. Войдите на https://my.pcloud.com"
+            echo "2. Убедитесь что пароль верный"
+            echo "3. Отключите 2FA или получите App Password"
+          fi
+        fi
