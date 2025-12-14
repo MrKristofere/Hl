@@ -1,122 +1,58 @@
-name: Get pCloud Token (Fully Encoded)
+name: Debug pCloud Auth
 
 on:
   workflow_dispatch:
 
 jobs:
-  get-token:
+  debug:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Get Token with Full Encoding
+    - name: Debug Authentication
       env:
         PCLOUD_EMAIL: ${{ secrets.PCLOUD_EMAIL }}
         PCLOUD_PASSWORD: ${{ secrets.PCLOUD_PASSWORD }}
       run: |
-        echo "=== ПОЛНОЕ КОДИРОВАНИЕ ВСЕХ СИМВОЛОВ ==="
+        echo "=== ДИАГНОСТИКА АВТОРИЗАЦИИ ==="
         
-        # 1. Диагностика входных данных
-        echo "🔍 Исходные данные:"
-        echo "Email: '$PCLOUD_EMAIL'"
+        # Показать что в переменных (без пароля)
+        echo "Email (первые 10 символов): '${PCLOUD_EMAIL:0:10}'"
         echo "Длина email: ${#PCLOUD_EMAIL}"
         echo "Длина пароля: ${#PCLOUD_PASSWORD}"
         
-        # Показываем проблемные символы
-        echo -e "\n🔍 Поиск проблемных символов:"
+        # Тест 1: Простой запрос
+        echo -e "\n🔍 Тест 1: Простой запрос"
+        curl -s -X POST \
+          -d "getauth=1&username=test@example.com&password=test123" \
+          https://api.pcloud.com/userinfo | grep -o '"result":[0-9]*'
         
-        # Проверяем email
-        echo "В email есть:"
-        [[ "$PCLOUD_EMAIL" == *@* ]] && echo "  @ (собака) - ДА"
-        [[ "$PCLOUD_EMAIL" == *.* ]] && echo "  . (точка) - ДА"
-        [[ "$PCLOUD_EMAIL" == *+* ]] && echo "  + (плюс) - ДА"
-        [[ "$PCLOUD_EMAIL" == *=* ]] && echo "  = (равно) - ДА"
+        # Тест 2: С нашими данными через --data-urlencode
+        echo -e "\n🔍 Тест 2: С нашими данными"
+        curl -s -X POST \
+          --data-urlencode "getauth=1" \
+          --data-urlencode "username=$PCLOUD_EMAIL" \
+          --data-urlencode "password=$PCLOUD_PASSWORD" \
+          https://api.pcloud.com/userinfo
         
-        # 2. КОМПЛЕКСНОЕ КОДИРОВАНИЕ
-        echo -e "\n🔧 Комплексное кодирование..."
+        # Тест 3: С закодированными данными
+        echo -e "\n🔍 Тест 3: С кодированием"
         
-        # Способ 1: Через Python (надежнее всего)
-        ENCODED_EMAIL=$(python3 << EOF
-import urllib.parse
-import sys
-email = """$PCLOUD_EMAIL"""
-# Кодируем ВСЁ, даже безопасные символы
-encoded = urllib.parse.quote(email, safe='')
-print(encoded)
-EOF
-        )
+        # Создаем временные файлы для безопасной передачи
+        cat > /tmp/email.txt << EOF
+        $PCLOUD_EMAIL
+        EOF
         
-        ENCODED_PASSWORD=$(python3 << EOF
-import urllib.parse
-import sys
-password = """$PCLOUD_PASSWORD"""
-# Кодируем ВСЁ для пароля
-encoded = urllib.parse.quote(password, safe='')
-print(encoded)
-EOF
-        )
+        cat > /tmp/password.txt << EOF
+        $PCLOUD_PASSWORD
+        EOF
         
-        echo "Email закодирован: $ENCODED_EMAIL"
-        echo "Пароль закодирован: ${ENCODED_PASSWORD:0:30}..."
+        # Кодируем из файлов
+        ENC_EMAIL=$(python3 -c "import urllib.parse; print(urllib.parse.quote(open('/tmp/email.txt').read().strip()))")
+        ENC_PASS=$(python3 -c "import urllib.parse; print(urllib.parse.quote(open('/tmp/password.txt').read().strip()))")
         
-        # 3. ОТПРАВКА ЗАПРОСА
-        echo -e "\n📤 Отправка запроса..."
+        curl -s -X POST \
+          -d "getauth=1&username=$ENC_EMAIL&password=$ENC_PASS" \
+          https://api.pcloud.com/userinfo | grep -o '"result":[0-9]*\|"auth":"[^"]*"'
         
-        # Формируем тело запроса ВРУЧНУЮ с кодированными данными
-        REQUEST_BODY="getauth=1&username=${ENCODED_EMAIL}&password=${ENCODED_PASSWORD}"
-        
-        echo "Тело запроса:"
-        echo "getauth=1&username=${ENCODED_EMAIL:0:30}...&password=${ENCODED_PASSWORD:0:10}..."
-        
-        RESPONSE=$(curl -s -v -X POST \
-          -H "Content-Type: application/x-www-form-urlencoded" \
-          -d "$REQUEST_BODY" \
-          https://api.pcloud.com/userinfo 2>&1)
-        
-        # Извлекаем только JSON ответ
-        JSON_RESPONSE=$(echo "$RESPONSE" | grep -A 100 "^{" | head -20)
-        
-        echo -e "\n📥 Ответ сервера:"
-        echo "$JSON_RESPONSE"
-        
-        # 4. ОБРАБОТКА ОТВЕТА
-        AUTH_TOKEN=$(echo "$JSON_RESPONSE" | grep -o '"auth":"[^"]*"' | cut -d'"' -f4)
-        
-        if [ -n "$AUTH_TOKEN" ]; then
-          echo -e "\n✅ УСПЕХ! Auth token получен: ${AUTH_TOKEN:0:20}..."
-          
-          # 5. ДОЛГОСРОЧНЫЙ ТОКЕН
-          echo -e "\n🔄 Создаем долгосрочный токен..."
-          
-          LONG_RESPONSE=$(curl -s -X POST \
-            "https://api.pcloud.com/gettoken?auth=$AUTH_TOKEN&expires=31536000&access=readwrite&appname=GitHub%20Actions")
-          
-          LONG_TOKEN=$(echo "$LONG_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
-          
-          if [ -n "$LONG_TOKEN" ]; then
-            echo -e "\n🎉 ДОЛГОСРОЧНЫЙ ТОКЕН СОЗДАН!"
-            echo "=================================="
-            echo "ТОКЕН: $LONG_TOKEN"
-            echo "=================================="
-            echo ""
-            echo "💡 Сохраните как PCLOUD_LONG_TOKEN в GitHub Secrets"
-          else
-            echo "❌ Не удалось создать долгосрочный токен"
-          fi
-          
-        else
-          echo -e "\n❌ ОШИБКА: Auth token не получен"
-          
-          # Детальный анализ ошибки
-          if echo "$JSON_RESPONSE" | grep -q '"result":2000'; then
-            echo "   Код 2000: Неверный логин/пароль"
-            echo ""
-            echo "🔧 РЕКОМЕНДАЦИИ:"
-            echo "1. Используйте App Password вместо основного"
-            echo "2. Временно отключите 2FA"
-            echo "3. Попробуйте другой браузер для входа"
-          fi
-          
-          # Показываем полный ответ для отладки
-          echo -e "\n🔍 Полный ответ curl:"
-          echo "$RESPONSE" | tail -50
-        fi
+        # Очистка
+        rm -f /tmp/email.txt /tmp/password.txt
