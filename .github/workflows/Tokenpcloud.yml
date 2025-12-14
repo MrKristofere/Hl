@@ -1,0 +1,131 @@
+name: Get pCloud Long-term Token
+
+on:
+  workflow_dispatch:  # Только ручной запуск
+
+jobs:
+  get-token:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Generate Long-term pCloud Token
+      env:
+        PCLOUD_EMAIL: ${{ secrets.PCLOUD_EMAIL }}
+        PCLOUD_PASSWORD: ${{ secrets.PCLOUD_PASSWORD }}
+      run: |
+        echo "=== ПОЛУЧЕНИЕ ДОЛГОСРОЧНОГО ТОКЕНА PCLOUD ==="
+        echo "Токен будет действителен 1 ГОД (31536000 секунд)"
+        echo ""
+        
+        # ===== 1. ПОЛУЧАЕМ ВРЕМЕННЫЙ ТОКЕН =====
+        echo "🔐 Шаг 1: Получаем временный токен..."
+        
+        TEMP_RESPONSE=$(curl -s -X POST \
+          -d "getauth=1&username=$PCLOUD_EMAIL&password=$PCLOUD_PASSWORD" \
+          https://api.pcloud.com/userinfo)
+        
+        echo "Ответ: $TEMP_RESPONSE"
+        
+        TEMP_TOKEN=$(echo "$TEMP_RESPONSE" | grep -o '"auth":"[^"]*"' | cut -d'"' -f4)
+        
+        if [ -z "$TEMP_TOKEN" ]; then
+          echo "❌ ОШИБКА: Не удалось получить временный токен"
+          
+          if echo "$TEMP_RESPONSE" | grep -q '"tfa_required":true'; then
+            echo ""
+            echo "⚠️  Включена двухфакторная аутентификация (2FA)"
+            echo "Добавьте этот шаг в начало скрипта:"
+            echo ""
+            echo "1. Получите tfauth:"
+            echo "   curl -d 'getauth=1&username=EMAIL&password=PASSWORD' \\"
+            echo "     https://api.pcloud.com/userinfo"
+            echo ""
+            echo "2. Используйте код 2FA:"
+            echo "   curl -d 'tfauth=TFAUTH_VALUE&totp=КОД_ИЗ_ПРИЛОЖЕНИЯ' \\"
+            echo "     https://api.pcloud.com/userinfo"
+          fi
+          
+          exit 1
+        fi
+        
+        echo "✅ Временный токен получен: ${TEMP_TOKEN:0:15}..."
+        
+        # ===== 2. СОЗДАЕМ ДОЛГОСРОЧНЫЙ ТОКЕН =====
+        echo ""
+        echo "🔐 Шаг 2: Создаем долгосрочный токен (1 год)..."
+        
+        # Параметры токена:
+        # - expires: срок действия в секундах (31536000 = 1 год)
+        # - access: права доступа (readwrite = чтение+запись)
+        # - appname: название приложения (будет видно в настройках)
+        
+        LONG_TERM_RESPONSE=$(curl -s -X POST \
+          "https://api.pcloud.com/gettoken?auth=$TEMP_TOKEN&expires=31536000&access=readwrite&appname=GitHub%20Actions%20Uploader")
+        
+        echo "Ответ: $LONG_TERM_RESPONSE"
+        
+        # ===== 3. ИЗВЛЕКАЕМ ДОЛГОСРОЧНЫЙ ТОКЕН =====
+        LONG_TERM_TOKEN=$(echo "$LONG_TERM_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+        
+        if [ -z "$LONG_TERM_TOKEN" ]; then
+          echo "❌ ОШИБКА: Не удалось создать долгосрочный токен"
+          exit 1
+        fi
+        
+        # ===== 4. ВЫВОД ИНФОРМАЦИИ =====
+        echo ""
+        echo "🎉 =========================================="
+        echo "✅ ДОЛГОСРОЧНЫЙ ТОКЕН УСПЕШНО СОЗДАН!"
+        echo "=========================================="
+        echo ""
+        echo "📋 ИНФОРМАЦИЯ О ТОКЕНЕ:"
+        echo "   Токен: $LONG_TERM_TOKEN"
+        echo "   Тип: Долгосрочный (Long-term)"
+        echo "   Срок: 1 год с момента создания"
+        echo "   Права: Чтение и запись (readwrite)"
+        echo "   Приложение: GitHub Actions Uploader"
+        echo ""
+        echo "🔧 КАК ИСПОЛЬЗОВАТЬ:"
+        echo "1. Скопируйте токен выше"
+        echo "2. В репозитории GitHub:"
+        echo "   Settings → Secrets and variables → Actions"
+        echo "3. Создайте новый секрет:"
+        echo "   Name: PCLOUD_LONG_TOKEN"
+        echo "   Value: $LONG_TERM_TOKEN"
+        echo ""
+        echo "📝 ПРИМЕР ИСПОЛЬЗОВАНИЯ В WORKFLOW:"
+        echo "  - name: Upload to pCloud"
+        echo "    env:"
+        echo "      PCLOUD_TOKEN: \${{ secrets.PCLOUD_LONG_TOKEN }}"
+        echo "    run: |"
+        echo "      curl -X POST \\"
+        echo "        \"https://api.pcloud.com/downloadfile?auth=\$PCLOUD_TOKEN&folderid=0&url=FILE_URL\""
+        echo ""
+        echo "⚠️  ВАЖНО:"
+        echo "• Токен виден только сейчас!"
+        echo "• Сохраните его в безопасном месте"
+        echo "• Для повторного просмотра нужно генерировать новый"
+        echo "• Управлять токенами: https://my.pcloud.com/#settings"
+        echo ""
+        echo "🎯 =========================================="
+        
+        # ===== 5. ПРОВЕРКА ТОКЕНА =====
+        echo ""
+        echo "🔍 Проверяем токен..."
+        
+        CHECK_RESPONSE=$(curl -s "https://api.pcloud.com/userinfo?auth=$LONG_TERM_TOKEN")
+        
+        if echo "$CHECK_RESPONSE" | grep -q '"result":0'; then
+          EMAIL=$(echo "$CHECK_RESPONSE" | grep -o '"email":"[^"]*"' | cut -d'"' -f4)
+          QUOTA=$(echo "$CHECK_RESPONSE" | grep -o '"quota":[0-9]*' | cut -d':' -f2)
+          QUOTA_GB=$((QUOTA / 1073741824))
+          USED=$(echo "$CHECK_RESPONSE" | grep -o '"usedquota":[0-9]*' | cut -d':' -f2)
+          USED_GB=$((USED / 1073741824))
+          
+          echo "✅ Токен работает!"
+          echo "   Аккаунт: $EMAIL"
+          echo "   Квота: ${QUOTA_GB} GB"
+          echo "   Использовано: ${USED_GB} GB"
+        else
+          echo "⚠️  Токен создан, но проверка не удалась"
+        fi
