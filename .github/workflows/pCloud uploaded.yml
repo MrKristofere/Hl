@@ -1,0 +1,102 @@
+name: Upload to pCloud via URL
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_url:
+        description: 'URL файла для загрузки'
+        required: true
+        type: string
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Upload file to pCloud
+      env:
+        PCLOUD_EMAIL: ${{ secrets.PCLOUD_EMAIL }}
+        PCLOUD_PASSWORD: ${{ secrets.PCLOUD_PASSWORD }}
+      run: |
+        echo "=== АВТОРИЗАЦИЯ И ЗАГРУЗКА В PCLOUD ==="
+        
+        # ===== 1. ПОЛУЧЕНИЕ АКТУАЛЬНОГО ТОКЕНА =====
+        echo "🔐 Получаем свежий auth token..."
+        
+        AUTH_RESPONSE=$(curl -s -X POST \
+          -d "username=$PCLOUD_EMAIL&password=$PCLOUD_PASSWORD" \
+          https://api.pcloud.com/userinfo)
+        
+        echo "Ответ авторизации: $AUTH_RESPONSE"
+        
+        # Извлекаем токен из ответа
+        AUTH_TOKEN=$(echo "$AUTH_RESPONSE" | grep -o '"auth":"[^"]*"' | cut -d'"' -f4)
+        
+        if [ -z "$AUTH_TOKEN" ]; then
+          echo "❌ ОШИБКА: Не удалось получить auth token"
+          echo "Проверьте логин и пароль в secrets"
+          exit 1
+        fi
+        
+        echo "✅ Получен токен: ${AUTH_TOKEN:0:15}..."
+        
+        # ===== 2. НАСТРОЙКА ПАРАМЕТРОВ =====
+        FILE_URL="${{ github.event.inputs.file_url }}"
+        FOLDER_ID="0"  # 0 = корневая папка
+        
+        # device - уникальный идентификатор для этого запуска
+        DEVICE="github-actions-${{ github.run_id }}"
+        
+        # Кодируем URL
+        ENCODED_URL=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$FILE_URL'))")
+        
+        echo "📦 Параметры:"
+        echo "   Устройство: $DEVICE"
+        echo "   URL файла: $FILE_URL"
+        echo "   Папка ID: $FOLDER_ID"
+        
+        # ===== 3. ЗАГРУЗКА ФАЙЛА ПО ССЫЛКЕ =====
+        echo -e "\n📤 Загружаем файл в pCloud..."
+        
+        UPLOAD_RESPONSE=$(curl -s -X POST \
+          "https://api.pcloud.com/downloadfile?auth=$AUTH_TOKEN&folderid=$FOLDER_ID&url=$ENCODED_URL&device=$DEVICE")
+        
+        echo "Ответ загрузки: $UPLOAD_RESPONSE"
+        
+        # ===== 4. ОБРАБОТКА ОТВЕТА =====
+        if echo "$UPLOAD_RESPONSE" | grep -q '"result":0'; then
+          echo -e "\n✅ УСПЕХ! Файл поставлен в очередь загрузки"
+          
+          # Извлекаем ID файла (разные варианты на случай изменения формата)
+          FILE_ID=$(echo "$UPLOAD_RESPONSE" | \
+            grep -o '"fileid":[0-9]*' | head -1 | cut -d':' -f2)
+          
+          if [ -z "$FILE_ID" ]; then
+            FILE_ID=$(echo "$UPLOAD_RESPONSE" | \
+              grep -o '"metadata":{[^}]*"fileid":[0-9]*' | \
+              grep -o '"fileid":[0-9]*' | cut -d':' -f2)
+          fi
+          
+          echo "📊 Детали:"
+          echo "   ID файла: $FILE_ID"
+          echo "   Ссылка:   https://my.pcloud.com/#page=file&id=$FILE_ID"
+          
+          # Сохраняем в outputs
+          echo "pcloud_file_id=$FILE_ID" >> $GITHUB_OUTPUT
+          
+        else
+          echo -e "\n❌ ОШИБКА ЗАГРУЗКИ"
+          echo "   Ответ API: $UPLOAD_RESPONSE"
+          
+          # Расшифровка ошибок
+          if echo "$UPLOAD_RESPONSE" | grep -q '"result":2005'; then
+            echo "   ПРИЧИНА: Неверный URL или файл недоступен"
+          elif echo "$UPLOAD_RESPONSE" | grep -q '"result":2003'; then
+            echo "   ПРИЧИНА: Недостаточно места в pCloud"
+          fi
+          
+          exit 1
+        fi
+    
+    outputs:
+      pcloud_file_id: ${{ steps.upload.outputs.pcloud_file_id }}
