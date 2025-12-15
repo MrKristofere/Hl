@@ -1,0 +1,31 @@
+name: Simple MediaFire Upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_url:
+        description: 'Ссылка на файл'
+        required: true
+      custom_name:
+        description: 'Имя файла в MediaFire'
+        required: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Upload to MediaFire
+      env:
+        MEDIAFIRE_EMAIL: ${{ secrets.MEDIAFIRE_EMAIL }}
+        MEDIAFIRE_PASSWORD: ${{ secrets.MEDIAFIRE_PASSWORD }}
+      run: |
+        python scripts/mediafire_uploader.py \
+          --url "${{ github.event.inputs.file_url }}" \
+          --email "$MEDIAFIRE_EMAIL" \
+          --password "$MEDIAFIRE_PASSWORD" \
+          --filename "${{ github.event.inputs.custom_name }}" \
+          --folder ""
