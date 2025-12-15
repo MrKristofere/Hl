@@ -1,31 +1,306 @@
-name: Simple MediaFire Upload
+name: Upload URL to MediaFire
 
 on:
   workflow_dispatch:
     inputs:
       file_url:
-        description: 'Ссылка на файл'
+        description: 'Прямая ссылка на файл для загрузки'
         required: true
-      custom_name:
-        description: 'Имя файла в MediaFire'
+        type: string
+      filename:
+        description: 'Имя файла в MediaFire (опционально)'
         required: false
+        type: string
+      folder_key:
+        description: 'Ключ папки в MediaFire (опционально)'
+        required: false
+        type: string
+        default: ''
+
+env:
+  # Используем публичные App ID/API Key от десктопного приложения MediaFire
+  MEDIAFIRE_APP_ID: "22870"
+  MEDIAFIRE_API_KEY: "h6k9k0v8a7v1e2d6"
 
 jobs:
-  upload:
+  upload-to-mediafire:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v5
       
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        pip install requests
+        
+    - name: Download file from URL
+      id: download
+      run: |
+        # Скачиваем файл из предоставленной ссылки
+        URL="${{ github.event.inputs.file_url }}"
+        
+        # Если имя файла не указано, извлекаем его из URL
+        if [ -z "${{ github.event.inputs.filename }}" ]; then
+          FILENAME=$(basename "$URL")
+          # Удаляем параметры запроса из имени файла
+          FILENAME=$(echo "$FILENAME" | cut -d'?' -f1)
+        else
+          FILENAME="${{ github.event.inputs.filename }}"
+        fi
+        
+        echo "Downloading $FILENAME from $URL..."
+        
+        # Скачиваем файл с обработкой возможных ошибок
+        if wget -O "$FILENAME" "$URL"; then
+          FILESIZE=$(stat -c%s "$FILENAME")
+          echo "Downloaded $FILENAME ($FILESIZE bytes)"
+          
+          echo "file_path=$FILENAME" >> $GITHUB_OUTPUT
+          echo "file_name=$FILENAME" >> $GITHUB_OUTPUT
+          echo "file_size=$FILESIZE" >> $GITHUB_OUTPUT
+        else
+          echo "Failed to download file"
+          exit 1
+        fi
+        
     - name: Upload to MediaFire
+      id: upload
       env:
         MEDIAFIRE_EMAIL: ${{ secrets.MEDIAFIRE_EMAIL }}
         MEDIAFIRE_PASSWORD: ${{ secrets.MEDIAFIRE_PASSWORD }}
+        MEDIAFIRE_FOLDER_KEY: ${{ github.event.inputs.folder_key }}
       run: |
-        python scripts/mediafire_uploader.py \
-          --url "${{ github.event.inputs.file_url }}" \
-          --email "$MEDIAFIRE_EMAIL" \
-          --password "$MEDIAFIRE_PASSWORD" \
-          --filename "${{ github.event.inputs.custom_name }}" \
-          --folder ""
+        python -c "
+        import requests
+        import os
+        import json
+        import sys
+        from urllib.parse import quote
+        
+        class MediaFireUploader:
+            def __init__(self, app_id, api_key):
+                self.base_url = 'https://www.mediafire.com/api/1.4'
+                self.app_id = app_id
+                self.api_key = api_key
+                self.session_token = None
+                self.session = requests.Session()
+                self.session.headers.update({
+                    'User-Agent': 'MediaFire GitHub Actions Uploader/1.0'
+                })
+            
+            def login(self, email, password):
+                \"\"\"Авторизация в MediaFire\"\"\"
+                print(f'Logging in as {email}...')
+                
+                params = {
+                    'email': email,
+                    'password': password,
+                    'application_id': self.app_id,
+                    'signature': self.api_key,
+                    'response_format': 'json',
+                    'token_version': 2
+                }
+                
+                try:
+                    response = self.session.get(
+                        f'{self.base_url}/user/get_session_token.php',
+                        params=params,
+                        timeout=30
+                    )
+                    
+                    if response.status_code != 200:
+                        print(f'HTTP Error: {response.status_code}')
+                        return False
+                    
+                    data = response.json()
+                    print(f'Login response: {json.dumps(data, indent=2)}')
+                    
+                    if data.get('response', {}).get('result') == 'Success':
+                        self.session_token = data['response']['session_token']
+                        print(f'✓ Login successful. Session token: {self.session_token[:20]}...')
+                        return True
+                    else:
+                        error_msg = data.get('response', {}).get('message', 'Unknown error')
+                        print(f'✗ Login failed: {error_msg}')
+                        return False
+                        
+                except Exception as e:
+                    print(f'✗ Login error: {str(e)}')
+                    return False
+            
+            def get_upload_url(self):
+                \"\"\"Получить URL для загрузки файла\"\"\"
+                params = {
+                    'session_token': self.session_token,
+                    'response_format': 'json'
+                }
+                
+                response = self.session.get(
+                    f'{self.base_url}/upload/get_upload_url.php',
+                    params=params,
+                    timeout=30
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('response', {}).get('result') == 'Success':
+                        return data['response']['upload_url']
+                
+                print(f'Failed to get upload URL: {response.text}')
+                return None
+            
+            def upload_file(self, file_path, folder_key=''):
+                \"\"\"Загрузить файл в MediaFire\"\"\"
+                filename = os.path.basename(file_path)
+                print(f'Uploading {filename} ({os.path.getsize(file_path)} bytes)...')
+                
+                # 1. Получаем URL для загрузки
+                upload_url = self.get_upload_url()
+                if not upload_url:
+                    return None
+                
+                print(f'Upload URL obtained: {upload_url[:50]}...')
+                
+                # 2. Загружаем файл
+                try:
+                    with open(file_path, 'rb') as f:
+                        files = {'file': (filename, f)}
+                        print('Sending file to upload server...')
+                        
+                        upload_response = self.session.post(
+                            upload_url,
+                            files=files,
+                            timeout=60
+                        )
+                        
+                        if upload_response.status_code != 200:
+                            print(f'Upload failed: {upload_response.status_code}')
+                            print(upload_response.text[:200])
+                            return None
+                        
+                        quick_key = upload_response.text.strip()
+                        print(f'✓ File uploaded. Quick key: {quick_key}')
+                        
+                        # 3. Регистрируем файл
+                        params = {
+                            'session_token': self.session_token,
+                            'quick_key': quick_key,
+                            'filename': filename,
+                            'response_format': 'json'
+                        }
+                        
+                        if folder_key:
+                            params['folder_key'] = folder_key
+                        
+                        print('Registering file...')
+                        register_response = self.session.get(
+                            f'{self.base_url}/upload/instant.php',
+                            params=params,
+                            timeout=30
+                        )
+                        
+                        if register_response.status_code == 200:
+                            data = register_response.json()
+                            if data.get('response', {}).get('result') == 'Success':
+                                result = data['response']
+                                print('✓ File registered successfully!')
+                                
+                                # Формируем ссылки
+                                quick_key = result.get('quickkey', '')
+                                links = {
+                                    'quick_key': quick_key,
+                                    'direct_link': f'https://www.mediafire.com/file/{quick_key}',
+                                    'download_link': f'https://download.mediafire.com/{quick_key}',
+                                    'filename': result.get('filename', filename),
+                                    'size': result.get('size', '0')
+                                }
+                                return links
+                        
+                        print(f'Registration failed: {register_response.text}')
+                        return None
+                        
+                except Exception as e:
+                    print(f'✗ Upload error: {str(e)}')
+                    return None
+        
+        # ===== ОСНОВНОЙ КОД =====
+        try:
+            # Получаем данные из окружения
+            email = os.environ['MEDIAFIRE_EMAIL']
+            password = os.environ['MEDIAFIRE_PASSWORD']
+            file_path = '${{ steps.download.outputs.file_path }}'
+            folder_key = os.environ.get('MEDIAFIRE_FOLDER_KEY', '')
+            
+            print('=' * 50)
+            print('MediaFire Uploader for GitHub Actions')
+            print('=' * 50)
+            
+            # Создаем и настраиваем загрузчик
+            uploader = MediaFireUploader(
+                app_id='${{ env.MEDIAFIRE_APP_ID }}',
+                api_key='${{ env.MEDIAFIRE_API_KEY }}'
+            )
+            
+            # Логинимся
+            if not uploader.login(email, password):
+                print('::error::Authentication failed')
+                sys.exit(1)
+            
+            # Загружаем файл
+            result = uploader.upload_file(file_path, folder_key)
+            
+            if result:
+                print('\\n' + '=' * 50)
+                print('UPLOAD SUCCESSFUL!')
+                print('=' * 50)
+                print(f'File: {result[\"filename\"]}')
+                print(f'Size: {result[\"size\"]} bytes')
+                print(f'Quick Key: {result[\"quick_key\"]}')
+                print(f'Direct Link: {result[\"direct_link\"]}')
+                print(f'Download Link: {result[\"download_link\"]}')
+                
+                # Сохраняем результаты для следующих шагов
+                with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                    f.write(f'quick_key={result[\"quick_key\"]}\\n')
+                    f.write(f'direct_link={result[\"direct_link\"]}\\n')
+                    f.write(f'download_link={result[\"download_link\"]}\\n')
+                    f.write(f'filename={result[\"filename\"]}\\n')
+                    f.write(f'size={result[\"size\"]}\\n')
+            else:
+                print('::error::Upload failed')
+                sys.exit(1)
+                
+        except KeyError as e:
+            print(f'::error::Missing environment variable: {e}')
+            sys.exit(1)
+        except Exception as e:
+            print(f'::error::Unexpected error: {str(e)}')
+            sys.exit(1)
+        "
+        
+    - name: Display results
+      if: success()
+      run: |
+        echo " "
+        echo "========================================="
+        echo "🚀 Upload completed successfully!"
+        echo "========================================="
+        echo "📁 File: ${{ steps.upload.outputs.filename }}"
+        echo "📦 Size: ${{ steps.upload.outputs.size }} bytes"
+        echo "🔑 Quick Key: ${{ steps.upload.outputs.quick_key }}"
+        echo "🔗 Direct Link: ${{ steps.upload.outputs.direct_link }}"
+        echo "⬇️  Download Link: ${{ steps.upload.outputs.download_link }}"
+        echo "========================================="
+        echo " "
+        
+    - name: Cleanup downloaded file
+      if: always()
+      run: |
+        rm -f "${{ steps.download.outputs.file_path }}" 2>/dev/null || true
+        echo "Temporary files cleaned up"
